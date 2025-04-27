@@ -3,5 +3,5 @@ server/keys.py
 
 # ignore ALL files in ANY directory specified here
 myenv/
-__pycache__/
+**/__pycache__/
 .cache/
