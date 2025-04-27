@@ -73,6 +73,7 @@ def extract_attributes(message):
                         Separate multiple keywords in the same field by commas without any additional text.
                         Do not include explanations, introductions, or any extra information—only output the JSON.
                         Focus on concise, meaningful keywords directly related to the given categories.
+                        Do not try to format the json output with characters like ```json
 
                         # Category guidelines #
                         Shape: Words that describe form, geometry, structure (e.g., circle, rectangular, twisting, modular).
