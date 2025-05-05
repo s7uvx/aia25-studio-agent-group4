@@ -8,9 +8,16 @@ def classify_input(message):
             {
                 "role": "system",
                 "content": """
-                        Your task is to classify if the user message is related to buildings / architecture or not.
+                        Your task is to classify if the user message is related to buildings and architecture or not.
                         Output only the classification string.
-                        If it is related, output "Related", if not, output "Refure to answer".
+                        If it is related, output "Related", if not, output "Refuse to answer".
+
+                        # Example #
+                        User message: "How do I bake cookies?"
+                        Output: "Refuse to answer"
+
+                        User message: "What is the tallest skyscrapper in the world?"
+                        Output: "Related"
                         """,
             },
             {
