@@ -3,16 +3,18 @@ from openai import OpenAI
 from server.keys import *
 
 # Mode
-mode = "openai" # "local" or "openai" or "cloudflare"
+mode = "local" # "local" or "openai" or "cloudflare"
 
 # API
 local_client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 cloudflare_client = OpenAI(base_url = f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1", api_key = CLOUDFLARE_API_KEY)
 
+
 # Embedding Models
 local_embedding_model = "nomic-ai/nomic-embed-text-v1.5-GGUF"
 cloudflare_embedding_model = "@cf/baai/bge-base-en-v1.5"
+openai_embedding_model = "text-embedding-3-small"
 
 # Notice how this model is not running locally. It uses an OpenAI key.
 gpt4o = [
@@ -55,7 +57,7 @@ def api_mode (mode):
         client = openai_client
         completion_model = gpt4o
         completion_model = completion_model[0]['model']
-        embedding_model = local_embedding_model
+        embedding_model = openai_embedding_model
 
         return client, completion_model, embedding_model
     else:

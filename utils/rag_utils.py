@@ -6,7 +6,10 @@ from server.config import *
 
 def get_embedding(text, model=embedding_model):
     text = text.replace("\n", " ")
-    response = local_client.embeddings.create(input = [text], model=model)
+    if mode == "openai":
+        response = client.embeddings.create(input = [text], dimensions = 768, model=model)
+    else:
+        response = client.embeddings.create(input = [text], model=model)
     vector = response.data[0].embedding
     return vector
 
