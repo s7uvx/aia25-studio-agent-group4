@@ -1,4 +1,8 @@
-# AIA25-Studio-Agent
+# AIA25-Studio-Agent Group 4
+
+Herein we present the AIA Studio Agent for Group 4, an LLM that helps designers understand the cost and valuation impacts of their decision.
+
+___
 
 Welcome to the AIA25-Studio-Agent template repository! This serves as a starting point for students in the AIA25-Studio class to create their design assistant copilots. The goal of the project is to orchestrate Large Language Models (LLMs) to assist in architectural design tasks. The assistant copilots can be connected to platforms such as Grasshopper in Rhino, Revit, or web apps, depending on your needs, but that is beyond the scope of this starting template.
 
