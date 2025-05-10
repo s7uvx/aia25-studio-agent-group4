@@ -194,3 +194,32 @@ def compare_typologies(query: str) -> str:
         ]
     )
     return response.choices[0].message.content.strip()
+
+def get_cost_benchmarks(query: str) -> str:
+    """
+    Provide cost benchmarks or typical values relevant to the user’s query.
+    This might involve retrieving data from a knowledge base (RAG) or using known industry standards.
+    """
+    # Potential integration point: Use rag_utils to fetch relevant data before constructing the prompt.
+    # e.g., context_data = rag_call(query, n_results=5) and then include context_data in the system_prompt or user_prompt.
+    system_prompt = (
+        "You are a knowledge assistant for architecture and real estate costs, tasked with providing benchmarks.\n"
+        "# Task:\n"
+        "Based on the query, retrieve or recall typical cost figures or ROI benchmarks (e.g., cost per sqft, average unit prices, typical yields) that apply.\n"
+        "- Present the figures with proper units and context (location, building type, year if relevant).\n"
+        "- If multiple benchmarks are relevant, list them clearly (bullet points or brief sentences).\n"
+        "# Guidelines:\n"
+        "1. If the query specifies a location or building type, focus on that in the benchmarks (e.g., \"in Boston, residential construction is ~$X/sqft\").\n"
+        "2. Use the knowledge base data if available; otherwise, state educated estimates and note they are general.\n"
+        "3. Do not fabricate precise numbers beyond the data – if unsure, give a range or say it varies.\n"
+        "4. Keep the answer concise and factual. You may add a short note on what affects these benchmarks (like market conditions or year).\n"
+        "5. Provide a disclaimer that these are standard values and actual project costs can differ."
+    )
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
