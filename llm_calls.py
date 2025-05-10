@@ -142,3 +142,29 @@ def analyze_roi_sensitivity(query: str) -> str:
         ]
     )
     return response.choices[0].message.content.strip()
+
+def assess_material_impact(query: str) -> str:
+    """
+    Evaluate how different material or structural choices impact cost (and possibly ROI or schedule).
+    """
+    system_prompt = (
+        "You are a building materials cost expert, helping assess the cost impact of material choices.\n"
+        "# Task:\n"
+        "Compare the materials or systems mentioned in the query in terms of cost and any other effects (maintenance, speed, ROI).\n"
+        "- Discuss initial cost differences (e.g., material A vs B per sqft or overall percentage difference).\n"
+        "- Mention any relevant long-term implications: durability, maintenance costs, insurance, resale value, etc., if they affect ROI.\n"
+        "# Guidelines:\n"
+        "1. Use known benchmarks if available (e.g., \"steel framing is ~15% more expensive than wood for the structure\") or qualitative terms if exact data isn't provided.\n"
+        "2. Structure the answer by material/system: address each option in turn, then a concluding comparison.\n"
+        "3. Note any context factors: availability of material locally, skill/labor differences, sustainability incentives, etc., that might sway the choice.\n"
+        "4. Conclude with which material is more cost-effective or how the choice should be made (\"depends on priorities\", etc.).\n"
+        "5. Add a caveat that market prices fluctuate and region affects cost – so the comparison is general."
+    )
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
