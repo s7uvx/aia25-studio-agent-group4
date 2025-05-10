@@ -1,6 +1,15 @@
 import random
 from openai import OpenAI
-from server.keys import *
+# from server.keys import *
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
+CLOUDFLARE_API_KEY = os.getenv("CLOUDFLARE_API_KEY")
 
 # Mode
 mode = "local" # "local" or "openai" or "cloudflare"

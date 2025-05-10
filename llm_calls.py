@@ -16,7 +16,7 @@ def classify_input(message):
                         User message: "How do I bake cookies?"
                         Output: "Refuse to answer"
 
-                        User message: "What is the tallest skyscrapper in the world?"
+                        User message: "What is the tallest skyscraper in the world?"
                         Output: "Related"
                         """,
             },

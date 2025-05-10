@@ -9,7 +9,7 @@ user_message = "How do architects balance form and function?"
 
 ### EXAMPLE 1: Router ###
 # Classify the user message to see if we should answer or not
-router_output = config.classify_input(user_message)
+router_output = llm_calls.classify_input(user_message)
 if router_output == "Refuse to answer":
     llm_answer = "Sorry, I can only answer questions about architecture."
 
@@ -37,5 +37,11 @@ else:
 
     ### EXAMPLE 5: RAG ####
     # Get a response based on the knowledge found
-    rag_result= rag_call(brutalist_question, embeddings = "knowledge/brutalism_embeddings.json", n_results = 10)
+    # rag_result= rag_call(brutalist_question, embeddings = "knowledge/brutalism_embeddings.json", n_results = 10)
+    # print(rag_result)
+    rag_result = rag_call(
+        brutalist_question, 
+        n_results=15,
+        max_context_length=3000  # Adjust based on your model's context window
+    )
     print(rag_result)

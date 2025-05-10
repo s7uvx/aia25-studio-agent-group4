@@ -7,3 +7,4 @@ myenv/
 .cache/
 .env
 source_data/
+LLM-Knowledge-Pool-RAG/

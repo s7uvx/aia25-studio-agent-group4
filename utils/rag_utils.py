@@ -1,7 +1,21 @@
+from sklearn.metrics.pairwise import cosine_similarity
 import numpy as np
-import json
-from server.config import *
+from collections import Counter
+import re
 
+import chromadb
+from chromadb.config import Settings
+from server.config import *
+# from llm_calls import rag_answer
+
+CHROMA_PATH = "chroma"
+
+def get_chroma_client():
+    client = chromadb.PersistentClient(
+        path=CHROMA_PATH,
+        settings=Settings(anonymized_telemetry=False)
+    )
+    return client
 # This script is only used as a RAG tool for other scripts.
 
 def get_embedding(text, model=embedding_model):
@@ -13,22 +27,22 @@ def get_embedding(text, model=embedding_model):
     vector = response.data[0].embedding
     return vector
 
-def similarity(v1, v2):
-    return np.dot(v1, v2)
+# def similarity(v1, v2):
+#     return np.dot(v1, v2)
 
-def load_embeddings(embeddings):
-    with open(embeddings, 'r', encoding='utf8') as infile:
-        return json.load(infile)
+# def load_embeddings(embeddings):
+#     with open(embeddings, 'r', encoding='utf8') as infile:
+#         return json.load(infile)
     
-def get_vectors(question_vector, index_lib, n_results):
-    scores = []
-    for vector in index_lib:
-        score = similarity(question_vector, vector['vector'])
-        scores.append({'content': vector['content'], 'score': score})
+# def get_vectors(question_vector, index_lib, n_results):
+#     scores = []
+#     for vector in index_lib:
+#         score = similarity(question_vector, vector['vector'])
+#         scores.append({'content': vector['content'], 'score': score})
 
-    scores.sort(key=lambda x: x['score'], reverse=True)
-    best_vectors = scores[0:n_results]
-    return best_vectors
+#     scores.sort(key=lambda x: x['score'], reverse=True)
+#     best_vectors = scores[0:n_results]
+#     return best_vectors
 
 def rag_answer(question, prompt, model=completion_model):
     completion = client.chat.completions.create(
@@ -45,30 +59,193 @@ def rag_answer(question, prompt, model=completion_model):
     )
     return completion.choices[0].message.content
 
-def rag_call(question, embeddings, n_results):
+# def rag_call(question, embeddings, n_results):
 
-    print("Initiating RAG...")
-    # Embed our question
-    question_vector = get_embedding(question)
+#     print("Initiating RAG...")
+#     # Embed our question
+#     question_vector = get_embedding(question)
 
-    # Load the knowledge embeddings
-    index_lib = load_embeddings(embeddings)
+#     # Load the knowledge embeddings
+#     index_lib = load_embeddings(embeddings)
 
-    # Retrieve the best vectors
-    scored_vectors = get_vectors(question_vector, index_lib, n_results)
-    scored_contents = [vector['content'] for vector in scored_vectors]
-    rag_result = "\n".join(scored_contents)
+#     # Retrieve the best vectors
+#     scored_vectors = get_vectors(question_vector, index_lib, n_results)
+#     scored_contents = [vector['content'] for vector in scored_vectors]
+#     rag_result = "\n".join(scored_contents)
 
-    # Get answer from vector informed query
-    prompt = f"""Answer the question based on the provided information. 
-                You are given the extracted parts of a long document and a question. Provide a direct answer.
-                If you don't know the answer, just say "I do not know." Don't make up an answer.
-                PROVIDED INFORMATION: """ + rag_result
+#     # Get answer from vector informed query
+#     prompt = f"""Answer the question based on the provided information. 
+#                 You are given the extracted parts of a long document and a question. Provide a direct answer.
+#                 If you don't know the answer, just say "I do not know." Don't make up an answer.
+#                 PROVIDED INFORMATION: """ + rag_result
     
-    # prompt = f"""Make a summary of the provided information. 
-    #             You are given the extracted parts of a long document. 
-    #             PROVIDED INFORMATION:  + {rag_result}
-    #             SUMMARY: """
+#     # prompt = f"""Make a summary of the provided information. 
+#     #             You are given the extracted parts of a long document. 
+#     #             PROVIDED INFORMATION:  + {rag_result}
+#     #             SUMMARY: """
 
-    answer = rag_answer(question, prompt)
-    return answer
+#     answer = rag_answer(question, prompt)
+#     return answer
+
+def rerank_results(results, question, max_length=4000):
+    """Rerank results and trim to fit context window"""
+    # Calculate relevance scores using basic keyword matching
+    scored_results = []
+    question_words = set(question.lower().split())
+    
+    for doc in results['documents'][0]:
+        # Count keyword matches
+        doc_words = set(doc.lower().split())
+        score = len(question_words.intersection(doc_words))
+        
+        # Add document length as a penalty factor
+        length_penalty = len(doc) / 1000  # Penalize very long documents
+        final_score = score / length_penalty
+        
+        scored_results.append((doc, final_score))
+    
+    # Sort by score and select best results that fit in context
+    scored_results.sort(key=lambda x: x[1], reverse=True)
+    
+    selected_docs = []
+    total_length = 0
+    
+    for doc, _ in scored_results:
+        if total_length + len(doc) <= max_length:
+            selected_docs.append(doc)
+            total_length += len(doc)
+    
+    return selected_docs
+
+# def rag_call(question, n_results=10, max_context_length=4000):
+#     print("Initiating RAG...")
+    
+#     # Get the client and collection
+#     client = get_chroma_client()
+#     collections = client.list_collections()
+#     if not collections:
+#         raise ValueError("No collections found in the database.")
+#     collection = collections[0]
+#     print(f"Using collection: {collection.name}")
+    
+#     # Query more documents than needed for better reranking
+#     results = collection.query(
+#         query_texts=[question],
+#         n_results=n_results * 2  # Get more results for reranking
+#     )
+    
+#     # Rerank and trim results to fit context window
+#     selected_docs = rerank_results(results, question, max_context_length)
+#     rag_result = "\n".join(selected_docs)
+
+#     # Create the prompt
+#     prompt = f"""Answer the question based on the provided information. 
+#                 Be concise and focus on the most relevant details.
+#                 If you don't know the answer, just say "I do not know."
+#                 QUESTION: {question}
+#                 PROVIDED INFORMATION: {rag_result}"""
+    
+#     answer = rag_answer(question=question, prompt=prompt)
+#     return answer
+def calculate_semantic_similarity(query_embedding, doc_embedding):
+    """Calculate cosine similarity between query and document embeddings"""
+    return cosine_similarity(
+        np.array(query_embedding).reshape(1, -1),
+        np.array(doc_embedding).reshape(1, -1)
+    )[0][0]
+
+def calculate_keyword_score(question, doc):
+    """Calculate keyword matching score with weights for important terms"""
+    # Architecture-specific important keywords
+    important_keywords = {
+        'architect': 2.0, 'design': 1.5, 'building': 1.5, 'structure': 1.5,
+        'space': 1.5, 'form': 1.5, 'function': 1.5, 'style': 1.2,
+        'material': 1.2, 'construction': 1.2
+    }
+    
+    question_words = question.lower().split()
+    doc_words = doc.lower().split()
+    
+    # Count matching keywords with weights
+    score = 0
+    for word in question_words:
+        if word in doc_words:
+            score += important_keywords.get(word, 1.0)
+    
+    return score
+
+def calculate_position_score(doc_index, total_docs):
+    """Give higher weight to documents appearing earlier in search results"""
+    return 1 - (doc_index / total_docs)
+
+def enhanced_rerank_results(results, question, max_length=4000):
+    """Enhanced reranking using multiple signals"""
+    scored_results = []
+    total_docs = len(results['documents'][0])
+    
+    # Get question embedding
+    question_embedding = results['embeddings'][0]
+    
+    for idx, (doc, doc_embedding) in enumerate(zip(results['documents'][0], results['embeddings'])):
+        # Calculate different scoring signals
+        semantic_score = calculate_semantic_similarity(question_embedding, doc_embedding)
+        keyword_score = calculate_keyword_score(question, doc)
+        position_score = calculate_position_score(idx, total_docs)
+        
+        # Calculate document density (information per length)
+        doc_length = len(doc)
+        unique_words = len(set(doc.lower().split()))
+        density_score = unique_words / (doc_length + 1)  # Add 1 to avoid division by zero
+        
+        # Combine scores with weights
+        final_score = (
+            semantic_score * 0.4 +    # Semantic similarity
+            keyword_score * 0.3 +     # Keyword matching
+            position_score * 0.2 +    # Position in results
+            density_score * 0.1       # Information density
+        )
+        
+        scored_results.append((doc, final_score))
+    
+    # Sort by score and select best results that fit context
+    scored_results.sort(key=lambda x: x[1], reverse=True)
+    
+    selected_docs = []
+    total_length = 0
+    context_window = max_length
+    
+    for doc, score in scored_results:
+        if total_length + len(doc) <= context_window:
+            selected_docs.append(doc)
+            total_length += len(doc)
+    
+    return selected_docs
+
+def rag_call(question, n_results=10, max_context_length=4000):
+    """Updated RAG call using enhanced reranking"""
+    print("Initiating RAG with enhanced reranking...")
+    
+    client = get_chroma_client()
+    collections = client.list_collections()
+    if not collections:
+        raise ValueError("No collections found in the database.")
+    collection = collections[0]
+    
+    # Get more results for reranking with embeddings
+    results = collection.query(
+        query_texts=[question],
+        n_results=n_results * 2,
+        include=['embeddings', 'documents']
+    )
+    
+    # Apply enhanced reranking
+    selected_docs = enhanced_rerank_results(results, question, max_context_length)
+    rag_result = "\n".join(selected_docs)
+    
+    prompt = f"""Answer the question based on the provided information.
+                Focus on the most relevant details and maintain coherence.
+                If you don't know the answer, just say "I do not know."
+                QUESTION: {question}
+                PROVIDED INFORMATION: {rag_result}"""
+    
+    return rag_answer(question=question, prompt=prompt)
