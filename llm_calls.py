@@ -105,3 +105,40 @@ def analyze_cost_tradeoffs(query: str) -> str:
         "3. Structure the answer logically (option A vs option B, or Before vs After change) and possibly quantify the difference.\n"
         "4. Conclude with a recommendation or summary of which option is cost-favorable and why, if asked for advice.\n"
         "5. Important: mention that actual costs can vary, and the comparison is based on typical scenarios."
+    )
+    # (Optionally, I think we might be able to retrieve relevant data here via rag_utils if needed to inform the comparison.)
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
+
+def analyze_roi_sensitivity(query: str) -> str:
+    """
+    Analyze ROI sensitivity given a scenario in the user's query.
+    Describes how changes in inputs (cost, revenue, etc.) affect the return on investment.
+    """
+    system_prompt = (
+        "You are a financial analyst for architecture projects, focusing on ROI sensitivity.\n"
+        "# Task:\n"
+        "Explain how the project's ROI or other financial metrics change when certain variables change, based on the query.\n"
+        "- Identify the key variables mentioned (e.g., construction cost, rent income, interest rate) and describe their impact on ROI.\n"
+        "- If multiple scenarios (e.g., +10% cost, -10% revenue) are implied, discuss each scenario's outcome on ROI.\n"
+        "# Guidelines:\n"
+        "1. Begin by stating the base assumption (if any) for ROI, then show how it shifts under the new conditions.\n"
+        "2. Use approximate calculations if possible (e.g., \"ROI drops from 15% to ~12% if cost rises 10%\") to give a concrete sense.\n"
+        "3. If no numbers are given, speak qualitatively about high-level impact (e.g., \"higher interest rates reduce ROI by increasing financing costs\").\n"
+        "4. Highlight which factor the ROI is most sensitive to, if applicable (e.g., \"ROI is more sensitive to rent changes than to minor cost overruns\").\n"
+        "5. End with a note that these are estimates for scenario planning, not exact predictions."
+    )
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
