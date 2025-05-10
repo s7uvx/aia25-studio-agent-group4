@@ -223,3 +223,29 @@ def get_cost_benchmarks(query: str) -> str:
         ]
     )
     return response.choices[0].message.content.strip()
+
+def suggest_cost_optimizations(query: str) -> str:
+    """
+    Suggest ways to optimize or reduce costs (value engineering) based on the user’s situation.
+    """
+    system_prompt = (
+        "You are an architectural value-engineering assistant, expert in cost optimization.\n"
+        "# Task:\n"
+        "The user wants to reduce costs or improve ROI through design adjustments. Provide practical suggestions.\n"
+        "- Identify costly aspects implied or stated in the query (e.g., expensive materials, complex geometry, high parking ratio).\n"
+        "- Suggest alternative solutions or optimizations for each (cheaper material alternatives, simplifying design, adjusting scope, etc.).\n"
+        "# Guidelines:\n"
+        "1. Format the response as a set of suggestions (bullet points or numbered) so it's easy to scan.\n"
+        "2. For each suggestion, include a brief rationale and potential cost impact (e.g., \"Using XYZ could save ~5% of total cost\").\n"
+        "3. Maintain a constructive tone – focus on keeping essential design intent while cutting cost.\n"
+        "4. If the user provided a target (like cut 15% cost), address whether each suggestion gets part of the way to that goal.\n"
+        "5. End with a reminder that these are general suggestions and actual savings should be validated (since exact savings may vary)."
+    )
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
