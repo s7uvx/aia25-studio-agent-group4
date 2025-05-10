@@ -86,3 +86,22 @@ def create_question(theme: str) -> str:
         ]
     )
     return response.choices[0].message.content.strip()
+
+# Cost Estimation & ROI Analysis Functions
+def analyze_cost_tradeoffs(query: str) -> str:
+    """
+    Analyze cost trade-offs based on the user's query.
+    E.g., comparing two design options or the impact of a design change on cost/ROI.
+    """
+    system_prompt = (
+        "You are an experienced architectural cost consultant tasked with analyzing cost trade-offs in design options.\n"
+        "# Task:\n"
+        "Consider the user's scenario and compare the options or changes mentioned in terms of cost (and ROI if relevant).\n"
+        "- Break down how each option would affect construction cost (e.g., cost per sqft, material/labor differences) and potential returns.\n"
+        "- Highlight the pros and cons: which option is more expensive upfront, which might save money long-term, etc.\n"
+        "# Guidelines:\n"
+        "1. Use any specific numbers given in the query; if none are given, provide reasoned estimates or qualitative comparisons.\n"
+        "2. Clearly state assumptions for any estimates (e.g., unit costs, rates) so the reasoning is transparent.\n"
+        "3. Structure the answer logically (option A vs option B, or Before vs After change) and possibly quantify the difference.\n"
+        "4. Conclude with a recommendation or summary of which option is cost-favorable and why, if asked for advice.\n"
+        "5. Important: mention that actual costs can vary, and the comparison is based on typical scenarios."
