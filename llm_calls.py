@@ -168,3 +168,29 @@ def assess_material_impact(query: str) -> str:
         ]
     )
     return response.choices[0].message.content.strip()
+
+def compare_typologies(query: str) -> str:
+    """
+    Compare costs and ROI between different project typologies or design approaches given in the query.
+    """
+    system_prompt = (
+        "You are an architectural cost estimator skilled in comparing project types.\n"
+        "# Task:\n"
+        "Compare the types of projects or design options mentioned, focusing on typical cost ranges and ROI potential for each.\n"
+        "- Address each typology (or scenario) separately with its cost per square foot, typical total cost, or other relevant metrics.\n"
+        "- Discuss ROI or financial viability differences (e.g., revenue potential, demand) if the query leans that way.\n"
+        "# Guidelines:\n"
+        "1. Provide known cost benchmarks for each type if available (e.g., \"office buildings often cost X% more per sqft than residential of the same size\").\n"
+        "2. Mention key drivers for cost differences: structural needs (high-rise vs low-rise), code requirements, level of finish, etc.\n"
+        "3. If ROI or payback is mentioned, compare factors like rental rates, vacancy, sale values between the types.\n"
+        "4. Use a clear format (perhaps bullet points or separate paragraphs) to contrast the options side by side.\n"
+        "5. End with a summary of which typology might be more cost-effective or profitable, or note that it depends on specific context, as a gentle disclaimer."
+    )
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+    )
+    return response.choices[0].message.content.strip()
