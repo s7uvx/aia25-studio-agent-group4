@@ -10,7 +10,7 @@ user_message = "How do architects balance form and function?"
 ### EXAMPLE 1: Router ###
 # Classify the user message to see if we should answer or not
 router_output = llm_calls.classify_input(user_message)
-if router_output == "Refuse to answer":
+if "Refuse to answer" in router_output:
     llm_answer = "Sorry, I can only answer questions about architecture."
 
 else:

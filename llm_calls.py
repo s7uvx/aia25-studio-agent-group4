@@ -13,7 +13,8 @@ def classify_input(message: str) -> str:
                 "Your task is to classify if the user message is related to buildings and architecture or not. "
                 "Output only a single word: If related, output 'Related'; if not, output 'Refuse to answer'."},
             {"role": "user", "content": message}
-        ]
+        ],
+        temperature=0.0,  # Lower temperature for deterministic output
     )
     return response.choices[0].message.content.strip()
 
@@ -36,7 +37,8 @@ def generate_concept(initial_info: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
-        ]
+        ],
+        temperature=0.8,  # Higher temperature for more creative output
     )
     return response.choices[0].message.content.strip()
 
@@ -61,7 +63,8 @@ def extract_attributes(description: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
-        ]
+        ],
+        temperature=0.0,  # Lower temperature for more deterministic output
     )
     return response.choices[0].message.content.strip()
 
@@ -83,7 +86,8 @@ def create_question(theme: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
-        ]
+        ],
+        temperature=0.7,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
@@ -112,7 +116,8 @@ def analyze_cost_tradeoffs(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.5,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
@@ -139,7 +144,8 @@ def analyze_roi_sensitivity(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.5,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
@@ -165,7 +171,8 @@ def assess_material_impact(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.3,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
@@ -191,7 +198,8 @@ def compare_typologies(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.5,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
@@ -220,7 +228,8 @@ def get_cost_benchmarks(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.0,  # Lower temperature for more deterministic output
     )
     return response.choices[0].message.content.strip()
 
@@ -246,6 +255,7 @@ def suggest_cost_optimizations(query: str) -> str:
         messages=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": query}
-        ]
+        ],
+        temperature=0.5,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
