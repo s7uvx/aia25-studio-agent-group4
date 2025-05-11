@@ -31,16 +31,20 @@ else:
     shape, theme, materials = (attributes[k] for k in ("shape", "theme", "materials"))
 
     ### EXAMPLE 3: Chaining ###
-    brutalist_question = llm_calls.create_question(theme)
-    print(brutalist_question)
+    # brutalist_question = llm_calls.create_question(theme)
+    # print(brutalist_question)
     # call llm with the output of a previous call
+    # material_answer = llm_calls.assess_material_impact(materials)
+    # print(material_answer)
+
+    materials_question = llm_calls.suggest_cost_optimizations(materials)
 
     ### EXAMPLE 5: RAG ####
     # Get a response based on the knowledge found
     # rag_result= rag_call(brutalist_question, embeddings = "knowledge/brutalism_embeddings.json", n_results = 10)
     # print(rag_result)
     rag_result = rag_call(
-        brutalist_question, 
+        materials_question, 
         n_results=15,
         max_context_length=3000  # Adjust based on your model's context window
     )

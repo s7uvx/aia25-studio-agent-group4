@@ -11,11 +11,21 @@ from server.config import *
 CHROMA_PATH = "chroma"
 
 def get_chroma_client():
+    """Get ChromaDB client with embedding function"""
+    from chromadb.utils import embedding_functions
+    
+    # Use the same embedding function as during creation
+    embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+        api_base="http://localhost:1234/v1",
+        api_key="not-needed",
+        model_name="nomic-embed-text"
+    )
+    
     client = chromadb.PersistentClient(
         path=CHROMA_PATH,
         settings=Settings(anonymized_telemetry=False)
     )
-    return client
+    return client, embedding_fn
 # This script is only used as a RAG tool for other scripts.
 
 def get_embedding(text, model=embedding_model):
@@ -221,17 +231,39 @@ def enhanced_rerank_results(results, question, max_length=4000):
     
     return selected_docs
 
+# def rag_call(question, n_results=10, max_context_length=4000):
+#     """Updated RAG call using enhanced reranking"""
+#     print("Initiating RAG with enhanced reranking...")
+    
+#     client = get_chroma_client()
+#     collections = client.list_collections()
+#     if not collections:
+#         raise ValueError("No collections found in the database.")
+#     collection = collections[0]
+    
+#     # q_vector = get_embedding(question)
+#     # Get more results for reranking with embeddings
+#     results = collection.query(
+#         query_texts=[question],
+#         n_results=n_results * 2,
+#         include=['embeddings', 'documents']
+#     )
 def rag_call(question, n_results=10, max_context_length=4000):
     """Updated RAG call using enhanced reranking"""
     print("Initiating RAG with enhanced reranking...")
     
-    client = get_chroma_client()
+    client, embedding_fn = get_chroma_client()
     collections = client.list_collections()
     if not collections:
         raise ValueError("No collections found in the database.")
-    collection = collections[0]
     
-    # Get more results for reranking with embeddings
+    # Get collection WITH embedding function
+    collection = client.get_collection(
+        name=collections[0].name,
+        embedding_function=embedding_fn
+    )
+    
+    # Rest of the function remains the same
     results = collection.query(
         query_texts=[question],
         n_results=n_results * 2,
