@@ -2,7 +2,7 @@
 # from llm_calls import * #update to comply with PEP8
 import server.config as config
 import llm_calls
-from utils.rag_utils import rag_call
+from utils import rag_utils
 import json
 
 user_message = "How do architects balance form and function?"
@@ -37,14 +37,22 @@ else:
     # material_answer = llm_calls.assess_material_impact(materials)
     # print(material_answer)
 
-    materials_question = llm_calls.suggest_cost_optimizations(materials)
+    materials_question = llm_calls.suggest_cost_optimizations(shape)
 
     ### EXAMPLE 5: RAG ####
     # Get a response based on the knowledge found
     # rag_result= rag_call(brutalist_question, embeddings = "knowledge/brutalism_embeddings.json", n_results = 10)
     # print(rag_result)
-    rag_result = rag_call(
-        materials_question, 
+    # rag_result = rag_call(
+    #     materials_question, 
+    #     n_results=15,
+    #     max_context_length=3000  # Adjust based on your model's context window
+    # )
+    collection, ranker = rag_utils.init_rag()
+    rag_result = rag_utils.rag_call_alt(
+        materials_question,
+        collection=collection,
+        ranker=ranker,
         n_results=15,
         max_context_length=3000  # Adjust based on your model's context window
     )

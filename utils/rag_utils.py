@@ -8,6 +8,8 @@ from chromadb.config import Settings
 from server.config import *
 # from llm_calls import rag_answer
 
+from flashrank import Ranker, RerankRequest
+
 CHROMA_PATH = "chroma"
 
 def get_chroma_client():
@@ -37,23 +39,6 @@ def get_embedding(text, model=embedding_model):
     vector = response.data[0].embedding
     return vector
 
-# def similarity(v1, v2):
-#     return np.dot(v1, v2)
-
-# def load_embeddings(embeddings):
-#     with open(embeddings, 'r', encoding='utf8') as infile:
-#         return json.load(infile)
-    
-# def get_vectors(question_vector, index_lib, n_results):
-#     scores = []
-#     for vector in index_lib:
-#         score = similarity(question_vector, vector['vector'])
-#         scores.append({'content': vector['content'], 'score': score})
-
-#     scores.sort(key=lambda x: x['score'], reverse=True)
-#     best_vectors = scores[0:n_results]
-#     return best_vectors
-
 def rag_answer(question, prompt, model=completion_model):
     completion = client.chat.completions.create(
         model=model,
@@ -68,34 +53,6 @@ def rag_answer(question, prompt, model=completion_model):
         temperature=0.1,
     )
     return completion.choices[0].message.content
-
-# def rag_call(question, embeddings, n_results):
-
-#     print("Initiating RAG...")
-#     # Embed our question
-#     question_vector = get_embedding(question)
-
-#     # Load the knowledge embeddings
-#     index_lib = load_embeddings(embeddings)
-
-#     # Retrieve the best vectors
-#     scored_vectors = get_vectors(question_vector, index_lib, n_results)
-#     scored_contents = [vector['content'] for vector in scored_vectors]
-#     rag_result = "\n".join(scored_contents)
-
-#     # Get answer from vector informed query
-#     prompt = f"""Answer the question based on the provided information. 
-#                 You are given the extracted parts of a long document and a question. Provide a direct answer.
-#                 If you don't know the answer, just say "I do not know." Don't make up an answer.
-#                 PROVIDED INFORMATION: """ + rag_result
-    
-#     # prompt = f"""Make a summary of the provided information. 
-#     #             You are given the extracted parts of a long document. 
-#     #             PROVIDED INFORMATION:  + {rag_result}
-#     #             SUMMARY: """
-
-#     answer = rag_answer(question, prompt)
-#     return answer
 
 def rerank_results(results, question, max_length=4000):
     """Rerank results and trim to fit context window"""
@@ -127,36 +84,6 @@ def rerank_results(results, question, max_length=4000):
     
     return selected_docs
 
-# def rag_call(question, n_results=10, max_context_length=4000):
-#     print("Initiating RAG...")
-    
-#     # Get the client and collection
-#     client = get_chroma_client()
-#     collections = client.list_collections()
-#     if not collections:
-#         raise ValueError("No collections found in the database.")
-#     collection = collections[0]
-#     print(f"Using collection: {collection.name}")
-    
-#     # Query more documents than needed for better reranking
-#     results = collection.query(
-#         query_texts=[question],
-#         n_results=n_results * 2  # Get more results for reranking
-#     )
-    
-#     # Rerank and trim results to fit context window
-#     selected_docs = rerank_results(results, question, max_context_length)
-#     rag_result = "\n".join(selected_docs)
-
-#     # Create the prompt
-#     prompt = f"""Answer the question based on the provided information. 
-#                 Be concise and focus on the most relevant details.
-#                 If you don't know the answer, just say "I do not know."
-#                 QUESTION: {question}
-#                 PROVIDED INFORMATION: {rag_result}"""
-    
-#     answer = rag_answer(question=question, prompt=prompt)
-#     return answer
 def calculate_semantic_similarity(query_embedding, doc_embedding):
     """Calculate cosine similarity between query and document embeddings"""
     return cosine_similarity(
@@ -231,23 +158,6 @@ def enhanced_rerank_results(results, question, max_length=4000):
     
     return selected_docs
 
-# def rag_call(question, n_results=10, max_context_length=4000):
-#     """Updated RAG call using enhanced reranking"""
-#     print("Initiating RAG with enhanced reranking...")
-    
-#     client = get_chroma_client()
-#     collections = client.list_collections()
-#     if not collections:
-#         raise ValueError("No collections found in the database.")
-#     collection = collections[0]
-    
-#     # q_vector = get_embedding(question)
-#     # Get more results for reranking with embeddings
-#     results = collection.query(
-#         query_texts=[question],
-#         n_results=n_results * 2,
-#         include=['embeddings', 'documents']
-#     )
 def rag_call(question, n_results=10, max_context_length=4000):
     """Updated RAG call using enhanced reranking"""
     print("Initiating RAG with enhanced reranking...")
@@ -274,6 +184,51 @@ def rag_call(question, n_results=10, max_context_length=4000):
     selected_docs = enhanced_rerank_results(results, question, max_context_length)
     rag_result = "\n".join(selected_docs)
     
+    prompt = f"""Answer the question based on the provided information.
+                Focus on the most relevant details and maintain coherence.
+                If you don't know the answer, just say "I do not know."
+                QUESTION: {question}
+                PROVIDED INFORMATION: {rag_result}"""
+    
+    return rag_answer(question=question, prompt=prompt)
+
+def init_rag():
+    print("Initiating RAG with enhanced reranking...")
+    
+    client, embedding_fn = get_chroma_client()
+    collections = client.list_collections()
+    if not collections:
+        raise ValueError("No collections found in the database.")
+    
+    # Get collection WITH embedding function
+    collection = client.get_collection(
+        name=collections[0].name,
+        embedding_function=embedding_fn
+    )
+
+    print(os.getcwd())
+
+    ranker = Ranker(model_name="ms-marco-MiniLM-L-12-v2", cache_dir=os.path.join(os.getcwd(), "models"))
+
+    return collection, ranker
+
+def rag_call_alt(question, collection, ranker, n_results=10, max_context_length=4000):
+    results = collection.query(
+        query_texts=[question],
+        n_results=n_results * 2,
+        include=['embeddings', 'documents']
+    )
+
+    
+    passagedocs = [{'id': i, 'text': doc} for i, doc in enumerate(results['documents'][0])]
+    rerankrequest = RerankRequest(query=question, passages=passagedocs)
+
+    selected_docs = ranker.rerank(rerankrequest)
+
+    # rag_result = "\n".join(selected_docs)
+    rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length]
+
+
     prompt = f"""Answer the question based on the provided information.
                 Focus on the most relevant details and maintain coherence.
                 If you don't know the answer, just say "I do not know."
