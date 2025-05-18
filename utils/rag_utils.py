@@ -6,7 +6,6 @@ import re
 import chromadb
 from chromadb.config import Settings
 from server.config import *
-# from llm_calls import rag_answer
 
 from flashrank import Ranker, RerankRequest
 
@@ -212,27 +211,27 @@ def init_rag():
 
     return collection, ranker
 
-def rag_call_alt(question, collection, ranker, n_results=10, max_context_length=4000):
+def rag_call_alt(question, collection, ranker, agent_prompt=None, n_results=10, max_context_length=4000):
+
     results = collection.query(
         query_texts=[question],
         n_results=n_results * 2,
         include=['documents']
     )
 
-    
     passagedocs = [{'id': i, 'text': doc} for i, doc in enumerate(results['documents'][0])]
     rerankrequest = RerankRequest(query=question, passages=passagedocs)
 
     selected_docs = ranker.rerank(rerankrequest)
 
-    # rag_result = "\n".join(selected_docs)
     rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length-20]
 
-
-    prompt = f"""Answer the question based on the provided information, 
-                you must reference your work using Vancouver style.
-                Focus on the most relevant details and maintain coherence.
-                If you don't know the answer, just say "I do not know."
+    if agent_prompt is None:
+        agent_prompt= """Answer the question based on the provided information, you must cite your references using Vancouver style.
+                        Focus on the most relevant details and maintain coherence. 
+                        If you don't know the answer, just say "I do not know."
+                        """
+    prompt = f"""{agent_prompt}
                 QUESTION: {question}
                 PROVIDED INFORMATION: {rag_result}"""
     

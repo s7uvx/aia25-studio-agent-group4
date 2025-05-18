@@ -1,5 +1,9 @@
 import server.config as config  
 
+# Routing Functions Below
+from utils import rag_utils
+
+
 # Joao Prompts:
 
 # Routing & Filtering Functions
@@ -190,127 +194,123 @@ def assess_material_impact(query: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
-def compare_typologies(query: str) -> str:
+
+def classify_question_type(message: str) -> str:
     """
-    Compare costs and ROI between different project typologies or design approaches given in the query.
+    Returns the category of the query: Cost Benchmark, ROI Analysis, Design-Cost Comparison, Value Engineering, or Project Data Lookup.
     """
     system_prompt = (
-        "You are an expert architectural cost estimator, skilled in comparing different project typologies and design approaches.\n"
-        "# Task:\n"
-        "Given a query comparing project types or design options, analyze and contrast their typical costs and ROI potential.\n"
-        "# Instructions:\n"
-        "- For each typology or scenario mentioned:\n"
-        "    - Provide known cost benchmarks (e.g., cost per square foot, total cost range) if available.\n"
-        "    - Discuss ROI or financial viability (e.g., rental rates, demand, payback period) if relevant.\n"
-        "    - Identify key drivers for cost and ROI differences: structural needs (high-rise vs low-rise), code requirements, level of finish, location, etc.\n"
-        "- Use a clear, side-by-side format (bullet points or separate paragraphs) to contrast the options.\n"
-        "- Clearly state any assumptions or typical market conditions you are using.\n"
-        "- End with a summary of which typology might be more cost-effective or profitable, or note that the answer depends on specific project context.\n"
-        "- Always add a disclaimer that actual costs and ROI can vary significantly by region, market, and project specifics.\n"
-        "# Example:\n"
-        "Query: Compare the cost and ROI of a mid-rise apartment building vs. a low-rise townhouse development.\n"
-        "Output:\n"
-        "- Mid-rise Apartment:\n"
-        "  - Typical construction cost: $250–$350/sqft (urban US markets)\n" # TODO fact-check this example
-        "  - Higher density, often higher ROI due to more units per land area\n"
-        "  - Requires elevators, more complex structure, higher code requirements\n"
-        "- Low-rise Townhouse:\n"
-        "  - Typical construction cost: $180–$250/sqft\n" # TODO fact-check this example
-        "  - Lower density, but may have faster sales and lower construction complexity\n"
-        "  - Simpler code requirements, easier phasing\n"
-        "Summary: Mid-rise apartments can offer higher ROI in dense markets, but townhouses may be more cost-effective and less risky in suburban contexts. Actual costs and returns depend on location, design, and market demand."
+        "You are a query classification agent for a building project assistant.\n"
+        "Classify the user's query into one of the following categories:\n"
+        "1. Cost Benchmark\n"
+        "2. ROI Analysis\n"
+        "3. Design-Cost Comparison\n"
+        "4. Value Engineering\n"
+        "5. Project Data Lookup\n"
+        "Return only the category name.\n\n"
+        "Examples:\n"
+        "Query: What is the typical cost per sqft for concrete in NYC?\nOutput: Cost Benchmark\n"
+        "Query: How much would I save by replacing glass with stone on the facade?\nOutput: Design-Cost Comparison\n"
+        "Query: If rents fall by 10%, what happens to ROI?\nOutput: ROI Analysis\n"
+        "Query: How can I lower construction costs without reducing quality?\nOutput: Value Engineering\n"
+        "Query: How many units does my current project support and what’s the total cost of concrete?\nOutput: Project Data Lookup"
     )
+
     response = config.client.chat.completions.create(
         model=config.completion_model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
+            {"role": "user", "content": message}
         ],
-        temperature=0.5,  # Adjust temperature for more or less creative responses
+        temperature=0.0,
     )
     return response.choices[0].message.content.strip()
 
-def get_cost_benchmarks(query: str) -> str:
+agent_prompt_dict = {
+    "analyze cost tradeoffs": """
+    You are a cost consultant.
+    Analyze trade-offs between different materials or design choices mentioned.
+    Compare based on construction cost, longevity, and typical ROI impacts.
+
+    Example:
+    Query: Should we use cross-laminated timber or reinforced concrete for the structure?
+    Output: CLT costs $320/sqft vs concrete at $280/sqft. CLT may reduce construction time by 15%, but has higher insurance costs. Concrete offers better durability.
+    """,
+    "analyze roi sensitivity": """
+    You are a financial analyst.
+    Evaluate how changes in construction cost, rent, or occupancy affect ROI.
+    Provide scenario-based sensitivity analysis.
+
+    Example:
+    Query: What happens if construction costs go up by 10%?
+    Output: ROI decreases from 12% to ~10.5%, assuming stable rents and no other changes.
+    """,
+    "get cost benchmarks": """
+    You are a cost benchmark assistant.
+    Provide standard cost per sqft values or material unit prices from industry data.
+    Tailor output to context (location, building type) if given.
+
+    Example:
+    Query: What is the average cost per sqft for office buildings in London?
+    Output: £400–£550/sqft, depending on spec and location (2023 estimate).
+    """,
+    "suggest cost optimizations": """
+    You are a value engineering assistant.
+    Suggest practical ways to reduce project costs while maintaining design intent.
+    Focus on materials, layout, structural systems.
+
+    Example:
+    Query: How can we reduce cost by 10% without changing the layout?
+    Output:
+    1. Replace curtain wall with punched window system (~8% savings).
+    2. Use modular bathrooms (~2–3% savings).
+    """,
+    "analyze project data inputs": """
+    You are a project insight analyst.
+    Use IFC/CSV and data encoding outputs to extract cost-related insights based on available quantities.
+    Return findings like concrete volume cost, or unit type ratios.
+
+    Example:
+    Query: What is the total concrete cost for this project?
+    Output: Based on 500 m³ at $120/m³, total cost = $60,000.
     """
-    Provide cost benchmarks or typical values relevant to the user’s query.
-    This might involve retrieving data from a knowledge base (RAG) or using known industry standards.
-    """
-    # Potential integration point: Use rag_utils to fetch relevant data before constructing the prompt.
-    # e.g., context_data = rag_call(query, n_results=5) and then include context_data in the system_prompt or user_prompt.
-    system_prompt = (
-        "You are a knowledgeable assistant for architecture and real estate costs, tasked with providing reliable cost and ROI benchmarks.\n"
-        "# Task:\n"
-        "Given the user's query, retrieve or recall typical cost figures or ROI benchmarks (e.g., cost per sqft, average unit prices, typical yields) that apply.\n"
-        "# Instructions:\n"
-        "- Present all figures with proper units and clear context (e.g., location, building type, year, or source if relevant).\n"
-        "- If multiple benchmarks are relevant, list them clearly using bullet points or concise sentences.\n"
-        "- If the query specifies a location, building type, or time period, tailor your answer to that context.\n"
-        "- Use knowledge base data if available; otherwise, provide educated estimates and clearly note when values are general or approximate.\n"
-        "- If you are unsure or data is unavailable, give a reasonable range or state that costs can vary widely.\n"
-        "- Keep the answer concise, factual, and easy to scan.\n"
-        "- Optionally, add a brief note on factors that affect these benchmarks (such as market conditions, inflation, or project complexity).\n"
-        "- Always include a disclaimer that these are standard values and actual project costs can differ significantly based on specific circumstances.\n"
-        "# Example:\n"
-        "Query: What is the typical construction cost per square foot for office buildings in London?\n"
-        "Output:\n"
-        "- Typical construction cost for office buildings in central London: £350–£600/sqft (2023, source: industry reports)\n" # TODO fact-check this example
-        "- Costs vary based on specification, location, and market conditions.\n"
-        "Note: These are standard benchmarks; actual project costs may differ."
-    )
+}
+
+def run_llm_query(system_prompt: str, user_input: str) -> str:
+    import server.config as config
     response = config.client.chat.completions.create(
         model=config.completion_model,
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
+            {"role": "user", "content": user_input}
         ],
-        temperature=0.0,  # Lower temperature for more deterministic output
+        temperature=0.0
     )
     return response.choices[0].message.content.strip()
 
-def suggest_cost_optimizations(query: str) -> str:
+def route_query_to_function(message: str, collection=None, ranker=None, use_rag: bool=False):
     """
-    Suggest ways to optimize or reduce costs (value engineering) based on the user’s situation.
+    Classify the user message into one of the five core categories and route it to the appropriate response function.
     """
-    system_prompt = (
-        "You are an architectural value-engineering assistant, expert in cost optimization.\n"
-        "# Task:\n"
-        "The user wants to reduce costs or improve ROI through design adjustments. Provide practical suggestions.\n"
-        "- Identify costly aspects implied or stated in the query (e.g., expensive materials, complex geometry, high parking ratio).\n"
-        "- Suggest alternative solutions or optimizations for each (cheaper material alternatives, simplifying design, adjusting scope, etc.).\n"
-        "# Guidelines:\n"
-        "1. Format the response as a set of suggestions (bullet points or numbered) so it's easy to scan.\n"
-        "2. For each suggestion, include a brief rationale and potential cost impact (e.g., \"Using XYZ could save ~5% of total cost\").\n"
-        "3. Maintain a constructive tone – focus on keeping essential design intent while cutting cost.\n"
-        "4. If the user provided a target (like cut 15% cost), address whether each suggestion gets part of the way to that goal.\n"
-        "5. End with a reminder that these are general suggestions and actual savings should be validated (since exact savings may vary)."
-    )
-    system_prompt = (
-        "You are an architectural value-engineering assistant, expert in cost optimization for building projects.\n"
-        "# Task:\n"
-        "Given the user's query, suggest practical ways to reduce costs or improve ROI through design, material, or process adjustments, while maintaining essential project goals.\n"
-        "# Instructions:\n"
-        "- Identify costly aspects or inefficiencies mentioned or implied in the query (e.g., premium materials, complex geometry, high parking ratio, over-specified systems).\n"
-        "- For each identified aspect or inefficiency, suggest solutions or optimizations (e.g., substitute materials, simplify design, adjust scope, modularize construction, optimize building systems).\n"
-        "- For each suggestion, briefly explain the rationale and estimate potential cost impact (e.g., \"Switching to X could save ~10% on facade costs\").\n"
-        "- If the user provides a savings target (e.g., \"reduce cost by 15%\"), address whether each suggestion contributes toward that goal.\n"
-        "- Use a clear, easy-to-scan format (bullet points or numbered list).\n"
-        "- Maintain a constructive, solution-oriented tone, focusing on preserving design intent where possible.\n"
-        "- End with a reminder that these are general suggestions and actual savings should be validated for the specific project.\n"
-        "# Example:\n"
-        "Query: How can we reduce costs for a mid-rise apartment building with a glass curtain wall and underground parking?\n"
-        "Output:\n"
-        "1. Replace the glass curtain wall with a mix of glass and insulated panels—can reduce facade costs by 10–20% while maintaining aesthetics.\n" # TODO fact-check this example
-        "2. Reduce the amount of underground parking or switch to surface parking if feasible—underground parking is often 3–4 times more expensive per space.\n" # TODO fact-check this example
-        "3. Simplify building geometry—fewer facade corners and unique shapes lower construction complexity and cost.\n"
-        "4. Standardize unit layouts and finishes—bulk purchasing and repetitive construction can yield 5–10% savings.\n"
-        "Note: These are general strategies; actual savings depend on project specifics and should be confirmed with your design and construction team." # TODO fact-check this example
-    )
-    response = config.client.chat.completions.create(
-        model=config.completion_model,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": query}
-        ],
-        temperature=0.5,  # Adjust temperature for more or less creative responses
-    )
-    return response.choices[0].message.content.strip()
+    classification = classify_question_type(message).lower()
+    print(classification)
+
+    match classification:
+        case x if "cost benchmark" in x:
+            prompt = agent_prompt_dict["get cost benchmarks"]
+        case x if "roi analysis" in x:
+            prompt = agent_prompt_dict["analyze roi sensitivity"]
+        case x if "design-cost comparison" in x:
+            prompt = agent_prompt_dict["analyze cost tradeoffs"]
+        case x if "value engineering" in x:
+            prompt = agent_prompt_dict["suggest cost optimizations"]
+        case x if "project data lookup" in x:
+            prompt = agent_prompt_dict["analyze project data inputs"]
+        case _:
+            return "I'm sorry, I cannot process this request. Please ask a question related to cost, ROI, or project data."
+    
+    if use_rag:
+        (answer, source) =  rag_utils.rag_call_alt(message, collection, ranker, agent_prompt=prompt)
+        return (answer, source)
+    else:
+        return run_llm_query(system_prompt=prompt, user_input=message)
