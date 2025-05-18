@@ -44,4 +44,21 @@ def classify_question_type(message: str) -> str:
         "Query: How many units does my current project support and what’s the total cost of concrete?\nOutput: Project Data Lookup"
     )
 
-   
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": message}
+        ],
+        temperature=0.0,
+    )
+    return response.choices[0].message.content.strip()
+
+# Routing Functions Below
+from .cost_questions import (
+    analyze_cost_tradeoffs,
+    analyze_roi_sensitivity,
+    get_cost_benchmarks,
+    suggest_cost_optimizations,
+    analyze_project_data_inputs
+)
