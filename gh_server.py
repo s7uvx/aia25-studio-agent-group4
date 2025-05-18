@@ -12,11 +12,12 @@ def llm_call():
     data = request.get_json()
     input_string = data.get('input', '')
 
-    router_output = llm_calls.classify_input(input_string)
-    if "Refuse to answer" in router_output:
-        answer = "Sorry, I can only answer questions about cost estimating and roi."
-    else:
-        answer = llm_calls.suggest_cost_optimizations(input_string)
+    # router_output = llm_calls.classify_input(input_string)
+    # if "Refuse to answer" in router_output:
+    #     answer = "Sorry, I can only answer questions about cost estimating and roi."
+    # else:
+    #     answer = llm_calls.suggest_cost_optimizations(input_string)
+    answer = llm_calls.route_query_to_function(input_string)
 
     return jsonify({'response': answer})
 
@@ -29,7 +30,8 @@ def llm_rag_call():
     # if "Refuse to answer" in router_output:
     #     answer = "Sorry, I can only answer questions about cost estimating and roi."
     # else:
-    answer, sources = rag_utils.rag_call_alt(input_string, collection, ranker)
+    # answer, sources = rag_utils.rag_call_alt(input_string, collection, ranker)
+    answer, sources = llm_calls.route_query_to_function(input_string, collection, ranker, True)
 
     return jsonify({'response': answer, 'sources': sources})
 
