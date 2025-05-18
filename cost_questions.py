@@ -59,3 +59,15 @@ def analyze_project_data_inputs(query: str) -> str:
     Output: Based on 500 m³ at $120/m³, total cost = $60,000.
     """
     return run_llm_query(prompt, query)
+
+def run_llm_query(system_prompt: str, user_input: str) -> str:
+    import server.config as config
+    response = config.client.chat.completions.create(
+        model=config.completion_model,
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_input}
+        ],
+        temperature=0.3
+    )
+    return response.choices[0].message.content.strip()
