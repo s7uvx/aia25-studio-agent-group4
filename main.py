@@ -1,6 +1,4 @@
-# from server.config import * #update to comply with PEP8
-# from llm_calls import * #update to comply with PEP8
-import server.config as config
+# import server.config as config
 import llm_calls
 from utils import rag_utils
 import json
@@ -11,7 +9,7 @@ user_message = "How do architects balance form and function?"
 # Classify the user message to see if we should answer or not
 router_output = llm_calls.classify_input(user_message)
 if "Refuse to answer" in router_output:
-    llm_answer = "Sorry, I can only answer questions about architecture."
+    llm_answer = "Sorry, I can only answer questions about cost estimating and roi."
 
 else:
     print(router_output)

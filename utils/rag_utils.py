@@ -50,7 +50,7 @@ def rag_answer(question, prompt, model=completion_model):
              "content": question
             }
         ],
-        temperature=0.1,
+        temperature=0.0,
     )
     return completion.choices[0].message.content
 
@@ -216,7 +216,7 @@ def rag_call_alt(question, collection, ranker, n_results=10, max_context_length=
     results = collection.query(
         query_texts=[question],
         n_results=n_results * 2,
-        include=['embeddings', 'documents']
+        include=['documents']
     )
 
     
@@ -226,13 +226,14 @@ def rag_call_alt(question, collection, ranker, n_results=10, max_context_length=
     selected_docs = ranker.rerank(rerankrequest)
 
     # rag_result = "\n".join(selected_docs)
-    rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length]
+    rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length-20]
 
 
-    prompt = f"""Answer the question based on the provided information.
+    prompt = f"""Answer the question based on the provided information, 
+                you must reference your work using Vancouver style.
                 Focus on the most relevant details and maintain coherence.
                 If you don't know the answer, just say "I do not know."
                 QUESTION: {question}
                 PROVIDED INFORMATION: {rag_result}"""
     
-    return rag_answer(question=question, prompt=prompt)
+    return rag_answer(question=question, prompt=prompt), rag_result

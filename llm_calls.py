@@ -89,7 +89,7 @@ def create_question(theme: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt}
         ],
-        temperature=0.7,  # Adjust temperature for more or less creative responses
+        temperature=0.3,  # Adjust temperature for more or less creative responses
     )
     return response.choices[0].message.content.strip()
 
