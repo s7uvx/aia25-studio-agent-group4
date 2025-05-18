@@ -33,3 +33,17 @@ def get_cost_benchmarks(query: str) -> str:
     Output: £400–£550/sqft, depending on spec and location (2023 estimate).
     """
     return run_llm_query(prompt, query)
+
+def suggest_cost_optimizations(query: str) -> str:
+    prompt = """
+    You are a value engineering assistant.
+    Suggest practical ways to reduce project costs while maintaining design intent.
+    Focus on materials, layout, structural systems.
+
+    Example:
+    Query: How can we reduce cost by 10% without changing the layout?
+    Output:
+    1. Replace curtain wall with punched window system (~8% savings).
+    2. Use modular bathrooms (~2–3% savings).
+    """
+    return run_llm_query(prompt, query)
