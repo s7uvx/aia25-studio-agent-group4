@@ -21,3 +21,15 @@ def analyze_roi_sensitivity(query: str) -> str:
     Output: ROI decreases from 12% to ~10.5%, assuming stable rents and no other changes.
     """
     return run_llm_query(prompt, query)
+
+def get_cost_benchmarks(query: str) -> str:
+    prompt = """
+    You are a cost benchmark assistant.
+    Provide standard cost per sqft values or material unit prices from industry data.
+    Tailor output to context (location, building type) if given.
+
+    Example:
+    Query: What is the average cost per sqft for office buildings in London?
+    Output: £400–£550/sqft, depending on spec and location (2023 estimate).
+    """
+    return run_llm_query(prompt, query)
