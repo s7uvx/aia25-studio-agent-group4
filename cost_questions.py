@@ -47,3 +47,15 @@ def suggest_cost_optimizations(query: str) -> str:
     2. Use modular bathrooms (~2–3% savings).
     """
     return run_llm_query(prompt, query)
+
+def analyze_project_data_inputs(query: str) -> str:
+    prompt = """
+    You are a project insight analyst.
+    Use IFC/CSV and data encoding outputs to extract cost-related insights based on available quantities.
+    Return findings like concrete volume cost, or unit type ratios.
+
+    Example:
+    Query: What is the total concrete cost for this project?
+    Output: Based on 500 m³ at $120/m³, total cost = $60,000.
+    """
+    return run_llm_query(prompt, query)
