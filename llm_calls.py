@@ -3,9 +3,6 @@ import server.config as config
 # Routing Functions Below
 from utils import rag_utils
 
-
-# Joao Prompts:
-
 # Routing & Filtering Functions
 def classify_input(message: str) -> str:
     """
@@ -236,6 +233,8 @@ agent_prompt_dict = {
     Query: Should we use cross-laminated timber or reinforced concrete for the structure?
     Output: CLT costs $320/sqft vs concrete at $280/sqft. CLT may reduce construction time by 15%, but has higher insurance costs. Concrete offers better durability.
     """,
+
+
     "analyze roi sensitivity": """
     You are a financial analyst.
     Evaluate how changes in construction cost, rent, or occupancy affect ROI.
@@ -254,6 +253,8 @@ agent_prompt_dict = {
     Query: What is the average cost per sqft for office buildings in London?
     Output: £400–£550/sqft, depending on spec and location (2023 estimate).
     """,
+
+
     "suggest cost optimizations": """
     You are a value engineering assistant.
     Suggest practical ways to reduce project costs while maintaining design intent.
@@ -265,6 +266,8 @@ agent_prompt_dict = {
     1. Replace curtain wall with punched window system (~8% savings).
     2. Use modular bathrooms (~2–3% savings).
     """,
+
+    
     "analyze project data inputs": """
     You are a project insight analyst.
     Use IFC/CSV and data encoding outputs to extract cost-related insights based on available quantities.
