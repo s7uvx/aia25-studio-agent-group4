@@ -36,10 +36,10 @@ These questions ask how different design choices impact cost, seeking an analysi
 
 - **Cost Data:** Construction and material costs from RSMeans or similar.
 - **Model Data:** The IFC model or Grasshopper data.
--- **Material Data:** Information on materials used in the project.
+  - **Material Data:** Information on materials used in the project.
 
 - **ROI Data:** Data on return on investment.
--- **ROI Models:** Models for calculating ROI.
+  - **ROI Models:** Models for calculating ROI.
 
 ### Parsing & Data Handling
 
@@ -141,10 +141,6 @@ These questions ask for standard costs, averages, or reference values.
 - The LLM’s job is mainly to format and contextualize the retrieved data, ensuring the answer is clear.
 
 ### Required Data
-
-- **RSMeans Construction Cost Data:** Primary source for unit costs and benchmarks.
-- **Industry Averages:** RSMeans book for construction costs and Zillow data for sale price per square foot.
-- **Location Adjustment Data:** Optionally, data to adjust costs to the project’s location if needed.
 
 - **Cost Data:** Construction and material costs from RSMeans or similar.
 - **Value Data:** Market value data for the project.
