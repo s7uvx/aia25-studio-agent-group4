@@ -12,7 +12,8 @@ CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
 CLOUDFLARE_API_KEY = os.getenv("CLOUDFLARE_API_KEY")
 
 # Mode
-mode = "local" # "local" or "openai" or "cloudflare"
+# mode = "local" # "local" or "openai" or "cloudflare"
+mode = "cloudflare" # "local" or "openai" or "cloudflare"
 
 # API
 local_client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
@@ -46,7 +47,7 @@ llama3 = [
 ]
 
 # This is a cloudflare model
-cloudflare_model = "@hf/nousresearch/hermes-2-pro-mistral-7b"
+cloudflare_model = "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 
 # Define what models to use according to chosen "mode"
 def api_mode (mode):
