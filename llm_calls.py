@@ -191,7 +191,6 @@ def assess_material_impact(query: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
-
 def classify_question_type(message: str) -> str:
     """
     Returns the category of the query: Cost Benchmark, ROI Analysis, Design-Cost Comparison, Value Engineering, or Project Data Lookup.
@@ -287,7 +286,8 @@ def run_llm_query(system_prompt: str, user_input: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_input}
         ],
-        temperature=0.0
+        temperature=0.0,
+        max_tokens=1500,
     )
     return response.choices[0].message.content.strip()
 
