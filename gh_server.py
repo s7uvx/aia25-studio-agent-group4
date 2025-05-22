@@ -5,7 +5,7 @@ from utils import rag_utils
 
 app = Flask(__name__)
 
-collection, ranker = rag_utils.init_rag()
+collection, ranker = rag_utils.init_rag(mode="cloudflare")
 
 @app.route('/llm_call', methods=['POST'])
 def llm_call():
