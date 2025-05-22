@@ -12,8 +12,8 @@ CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
 CLOUDFLARE_API_KEY = os.getenv("CLOUDFLARE_API_KEY")
 
 # Mode
-# mode = "local" # "local" or "openai" or "cloudflare"
-mode = "cloudflare" # "local" or "openai" or "cloudflare"
+mode = "local" # "local" or "openai" or "cloudflare"
+# mode = "cloudflare" # "local" or "openai" or "cloudflare"
 
 # API
 local_client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")

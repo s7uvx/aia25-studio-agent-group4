@@ -216,19 +216,46 @@ def rag_call_alt(question, collection, ranker, agent_prompt=None, n_results=10, 
     results = collection.query(
         query_texts=[question],
         n_results=n_results * 2,
-        include=['documents']
+        include=['documents', 'metadatas']
     )
 
-    passagedocs = [{'id': i, 'text': doc} for i, doc in enumerate(results['documents'][0])]
+    # passagedocs = [{'id': i, 'text': doc} for i, doc in enumerate(results['documents'][0])]
+    passagedocs = [{
+        'id': i,
+        'text': doc,
+        'metadata': meta
+    } for i, (doc, meta) in enumerate(zip(results['documents'][0], results['metadatas'][0]))]
+    
     rerankrequest = RerankRequest(query=question, passages=passagedocs)
-
     selected_docs = ranker.rerank(rerankrequest)
 
-    rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length-20]
+    # rag_result = "\n".join([doc['text'] for doc in selected_docs])[:max_context_length-20]
+    # Format documents with source information
+    formatted_docs = []
+    for doc in selected_docs:
+        source_info = f"\n[Source: {doc['metadata']['source']}]"
+        # if 'page_number' in doc['metadata']:
+        #     source_info += f", Page: {doc['metadata']['page_number']}"
+        # source_info += "]"
+        
+        formatted_docs.append(f"{doc['text']}{source_info}")
+
+    rag_result = "\n\n".join(formatted_docs)[:max_context_length-20]
 
     if agent_prompt is None:
-        agent_prompt= """Answer the question based on the provided information, you must cite your references using Vancouver style.
-                        Focus on the most relevant details and maintain coherence. 
+        agent_prompt= """Answer the question based on the provided information. 
+                        Each text chunk includes its source information in brackets.
+                        You must cite your sources and page number if available.
+                        Format references as: [Source: filename, Page: X]
+                        Focus on the most relevant details and maintain coherence.
+                        If you don't know the answer, just say "I do not know."
+                        """
+    else:
+        agent_prompt += """
+                        Each text chunk includes its source information in brackets.
+                        You must cite your sources and page number if available.
+                        Format references as: [Source: filename, Page: X]
+                        Focus on the most relevant details and maintain coherence.
                         If you don't know the answer, just say "I do not know."
                         """
     prompt = f"""{agent_prompt}
