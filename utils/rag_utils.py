@@ -11,17 +11,26 @@ from flashrank import Ranker, RerankRequest
 
 CHROMA_PATH = "chroma"
 
-def get_chroma_client():
-    """Get ChromaDB client with embedding function"""
+def get_chroma_client(mode="local"):
+    """Get ChromaDB client with embedding function based on mode (local, openai, cloudflare)"""
     from chromadb.utils import embedding_functions
-    
-    # Use the same embedding function as during creation
-    embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-        api_base="http://localhost:1234/v1",
-        api_key="not-needed",
-        model_name="nomic-embed-text"
-    )
-    
+    if mode == "openai":
+        embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+            api_key=OPENAI_API_KEY,
+            model_name=openai_embedding_model
+        )
+    elif mode == "cloudflare":
+        embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+            api_base=f"https://api.cloudflare.com/client/v4/accounts/{CLOUDFLARE_ACCOUNT_ID}/ai/v1",
+            api_key=CLOUDFLARE_API_KEY,
+            model_name=cloudflare_embedding_model
+        )
+    else:  # local
+        embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+            api_base="http://localhost:1234/v1",
+            api_key="not-needed",
+            model_name="nomic-embed-text"
+        )
     client = chromadb.PersistentClient(
         path=CHROMA_PATH,
         settings=Settings(anonymized_telemetry=False)
@@ -191,10 +200,9 @@ def rag_call(question, n_results=10, max_context_length=4000):
     
     return rag_answer(question=question, prompt=prompt)
 
-def init_rag():
+def init_rag(mode="local"):
     print("Initiating RAG with enhanced reranking...")
-    
-    client, embedding_fn = get_chroma_client()
+    client, embedding_fn = get_chroma_client(mode)
     collections = client.list_collections()
     if not collections:
         raise ValueError("No collections found in the database.")
