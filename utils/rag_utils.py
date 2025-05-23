@@ -40,6 +40,7 @@ def get_chroma_client(mode="local"):
 
 def get_embedding(text, model=embedding_model):
     text = text.replace("\n", " ")
+    mode = get_mode()
     if mode == "openai":
         response = client.embeddings.create(input = [text], dimensions = 768, model=model)
     else:
