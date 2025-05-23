@@ -34,17 +34,19 @@ def query_llm_with_rag(user_input, rag_mode):
     url = RAG_URLS.get(rag_mode, FLASK_URL)
     try:
         response = requests.post(url, json={"input": user_input})
-        response = output_header_markdown + response
         if response.status_code == 200:
             data = response.json()
             if "sources" in data:
-                return f"{data.get('response', 'No response from server.')}\n\n**Sources:**\n{data['sources']}"
+                return (
+                    output_header_markdown
+                    + f"{data.get('response', 'No response from server.')}\n\n**Sources:**\n{data['sources']}"
+                )
             else:
-                return data.get("response", "No response from server.")
+                return output_header_markdown + data.get("response", "No response from server.")
         else:
-            return f"Error: {response.status_code} - {response.text}"
+            return output_header_markdown + f"Error: {response.status_code} - {response.text}"
     except Exception as e:
-        return f"Exception: {str(e)}"
+        return output_header_markdown + f"Exception: {str(e)}"
 
 def run_flask_server():
     global flask_process
