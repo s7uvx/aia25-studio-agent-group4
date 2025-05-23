@@ -11,9 +11,17 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID")
 CLOUDFLARE_API_KEY = os.getenv("CLOUDFLARE_API_KEY")
 
-# Mode
-mode = "local" # "local" or "openai" or "cloudflare"
-# mode = "cloudflare" # "local" or "openai" or "cloudflare"
+# Mode control using getter/setter
+_mode = "cloudflare"  # default
+
+def get_mode():
+    global _mode
+    return _mode
+
+def set_mode(new_mode):
+    global _mode, client, completion_model, embedding_model
+    _mode = new_mode
+    client, completion_model, embedding_model = api_mode(_mode)
 
 # API
 local_client = OpenAI(base_url="http://localhost:1234/v1", api_key="lm-studio")
@@ -73,4 +81,4 @@ def api_mode (mode):
     else:
         raise ValueError("Please specify if you want to run local or openai models")
 
-client, completion_model, embedding_model = api_mode(mode)
+client, completion_model, embedding_model = api_mode(_mode)

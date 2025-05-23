@@ -2,10 +2,11 @@ from flask import Flask, request, jsonify
 # import ghhops_server as hs
 import llm_calls
 from utils import rag_utils
+from server import config
 
 app = Flask(__name__)
 
-collection, ranker = rag_utils.init_rag(mode="cloudflare")
+collection, ranker = rag_utils.init_rag(mode=config.get_mode())
 
 @app.route('/llm_call', methods=['POST'])
 def llm_call():
@@ -34,6 +35,22 @@ def llm_rag_call():
     answer, sources = llm_calls.route_query_to_function(input_string, collection, ranker, True)
 
     return jsonify({'response': answer, 'sources': sources})
+
+@app.route('/set_mode', methods=['POST'])
+def set_mode():
+    data = request.get_json()
+    mode = data.get('mode', None)
+    if mode not in ["local", "openai", "cloudflare"]:
+        return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
+    config.set_mode(mode)
+    # Optionally, re-initialize RAG collection/ranker if needed
+    global collection, ranker
+    collection, ranker = rag_utils.init_rag(mode=mode)
+    return jsonify({'status': 'success', 'mode': mode})
+
+@app.route('/status', methods=['GET'])
+def status():
+    return jsonify({'status': 'ok'}), 200
 
 if __name__ == '__main__':
     app.run(debug=True)
