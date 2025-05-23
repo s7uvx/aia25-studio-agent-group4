@@ -1,16 +1,34 @@
-#requirements: gradio, requests
+# gradio_gui.py
+# requirements: gradio, requests
 
+# === Imports ===
+import os
+import subprocess
 import gradio as gr
 import requests
-import subprocess
-import os
 import server.config as config
 
+# === Constants and Config ===
 FLASK_URL = "http://127.0.0.1:5000/llm_call"  # Update if Flask runs elsewhere
+RAG_OPTIONS = ["LLM only", "LLM + RAG"]
+RAG_URLS = {
+    "LLM only": FLASK_URL,
+    "LLM + RAG": "http://127.0.0.1:5000/llm_rag_call"
+}
+MODE_OPTIONS = ["local", "openai", "cloudflare"]
+MODE_URL = "http://127.0.0.1:5000/set_mode"
+sample_questions = [
+    "",
+    "How do steel frame structures compare to concrete frame structures, considering cost and durability?",
+    "What are the ROI advantages of using precast concrete in construction projects?",
+    "Can you provide a cost estimate for a 10,000 sq ft commercial building?",
+    "What are the key factors affecting the cost of a residential building?",
+]
 
+# === Global State ===
 flask_process = None
 
-# Function to call Flask server
+# === Utility Functions ===
 def query_llm(user_input):
     try:
         response = requests.post(FLASK_URL, json={"input": user_input})
@@ -20,12 +38,6 @@ def query_llm(user_input):
             return f"Error: {response.status_code} - {response.text}"
     except Exception as e:
         return f"Exception: {str(e)}"
-
-RAG_OPTIONS = ["LLM only", "LLM + RAG"]
-RAG_URLS = {
-    "LLM only": FLASK_URL,
-    "LLM + RAG": "http://127.0.0.1:5000/llm_rag_call"
-}
 
 def query_llm_with_rag(user_input, rag_mode):
     output_header_markdown = f"## LLM Output for {rag_mode}:\n\n"
@@ -71,9 +83,6 @@ def stop_flask_server():
     else:
         return "Flask server is not running."
 
-MODE_OPTIONS = ["local", "openai", "cloudflare"]
-MODE_URL = "http://127.0.0.1:5000/set_mode"
-
 def set_mode_on_server(selected_mode):
     try:
         response = requests.post(MODE_URL, json={"mode": selected_mode})
@@ -84,89 +93,80 @@ def set_mode_on_server(selected_mode):
     except Exception as e:
         return f"Exception: {str(e)}"
 
-sample_questions = [
-    "",
-    "How do steel frame structures compare to concrete frame structures, considering cost and durability?",
-    "What are the ROI advantages of using precast concrete in construction projects?",
-    "Can you provide a cost estimate for a 10,000 sq ft commercial building?",
-    "What are the key factors affecting the cost of a residential building?",
-]
+def update_placeholder(selected):
+    return gr.update(value=selected)
 
-with gr.Blocks() as demo:
-    gr.Markdown("# Flask Server Control Panel")
-    with gr.Row():
-        start_flask_btn = gr.Button("Start Flask Server")
-        stop_flask_btn = gr.Button("Stop Flask Server")
-        flask_status = gr.Textbox(label="Flask Server Status", lines=1)
-    with gr.Row():
-        gr.Markdown("### Note: The Flask server must be running to get a response.")
+# === Gradio UI Definition ===
+def build_gradio_app():
+    with gr.Blocks() as demo:
+        gr.Markdown("# Flask Server Control Panel")
+        with gr.Row():
+            start_flask_btn = gr.Button("Start Flask Server")
+            stop_flask_btn = gr.Button("Stop Flask Server")
+            flask_status = gr.Textbox(label="Flask Server Status", lines=1)
+        with gr.Row():
+            gr.Markdown("### Note: The Flask server must be running to get a response.")
 
-    gr.Markdown("## LLM Mode Selection")
-    with gr.Row():
-        mode_radio = gr.Radio(
-            choices=MODE_OPTIONS,
-            value="cloudflare",
-            label="Select LLM Mode",
-            interactive=True
-        )
-        mode_status = gr.Textbox(label="Current Mode", lines=1)
+        gr.Markdown("## LLM Mode Selection")
+        with gr.Row():
+            mode_radio = gr.Radio(
+                choices=MODE_OPTIONS,
+                value="cloudflare",
+                label="Select LLM Mode",
+                interactive=True
+            )
+            mode_status = gr.Textbox(label="Current Mode", lines=1)
 
-    mode_radio.change(
-        fn=set_mode_on_server,
-        inputs=mode_radio,
-        outputs=mode_status
-    )
-
-    gr.Markdown("## LLM Call Type")
-    with gr.Row():
-        rag_radio = gr.Radio(
-            choices=RAG_OPTIONS,
-            value="LLM only",
-            label="Choose LLM Call Type",
-            interactive=True
+        mode_radio.change(
+            fn=set_mode_on_server,
+            inputs=mode_radio,
+            outputs=mode_status
         )
 
-    gr.Markdown("# LLM Output Viewer\nEnter your question below:")
+        gr.Markdown("## LLM Call Type")
+        with gr.Row():
+            rag_radio = gr.Radio(
+                choices=RAG_OPTIONS,
+                value="LLM only",
+                label="Choose LLM Call Type",
+                interactive=True
+            )
 
-    with gr.Row():
-        sample_dropdown = gr.Dropdown(
-            choices=sample_questions,
-            label="Or select a sample question",
-            interactive=True,
-            value=None,
-            allow_custom_value=False,
-            info="Pick a sample or type your own below."
+        gr.Markdown("# LLM Output Viewer\nEnter your question below:")
+
+        with gr.Row():
+            sample_dropdown = gr.Dropdown(
+                choices=sample_questions,
+                label="Or select a sample question",
+                interactive=True,
+                value=None,
+                allow_custom_value=False,
+                info="Pick a sample or type your own below."
+            )
+        with gr.Row():
+            user_input = gr.Textbox(
+                label="Your Question",
+                lines=2,
+                value=sample_dropdown.value
+            )
+
+        sample_dropdown.change(
+            fn=update_placeholder,
+            inputs=sample_dropdown,
+            outputs=user_input,
         )
-    with gr.Row():
-        user_input = gr.Textbox(
-            label="Your Question",
-            lines=2,
-            value=sample_dropdown.value
-        )
 
-    # Update the placeholder when the dropdown changes
-    def update_placeholder(selected):
-        return gr.update(value=selected)
+        submit_btn = gr.Button("Submit")
+        with gr.Group():
+            output = gr.Markdown(label="LLM Output")
 
-    sample_dropdown.change(
-        fn=update_placeholder,
-        inputs=sample_dropdown,
-        outputs=user_input,
-    )
+        submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
+        start_flask_btn.click(fn=run_flask_server, outputs=flask_status)
+        stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
-    submit_btn = gr.Button("Submit")
-    with gr.Group():
-        output = gr.Markdown(label="LLM Output")
-    # output = gr.Textbox(label="LLM Output", lines=10)
+    return demo
 
-    submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
-    start_flask_btn.click(fn=run_flask_server, outputs=flask_status)
-    stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
-
-# run = False
-# if run:
-print("Running in local mode...")
-demo.launch(inbrowser=True)
-
-# Print the URL for the user
-# print(f"Open the following URL in your browser: {demo.url}")
+print("\n" * 10)
+print("Running gradio GUI...")
+app = build_gradio_app()
+app.launch(inbrowser=True)
