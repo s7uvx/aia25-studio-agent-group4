@@ -28,9 +28,13 @@ RAG_URLS = {
 }
 
 def query_llm_with_rag(user_input, rag_mode):
+    output_header_markdown = f"## LLM Output for {rag_mode}:\n\n"
+    output_header_markdown += f"### Input: {user_input}\n\n"
+
     url = RAG_URLS.get(rag_mode, FLASK_URL)
     try:
         response = requests.post(url, json={"input": user_input})
+        response = output_header_markdown + response
         if response.status_code == 200:
             data = response.json()
             if "sources" in data:
