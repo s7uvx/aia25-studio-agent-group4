@@ -4,6 +4,7 @@ import gradio as gr
 import requests
 import subprocess
 import os
+import server.config as config
 
 FLASK_URL = "http://127.0.0.1:5000/llm_call"  # Update if Flask runs elsewhere
 
@@ -44,6 +45,7 @@ def stop_flask_server():
         return "Flask server is not running."
 
 sample_questions = [
+    "",
     "How do steel frame structures compare to concrete frame structures, considering cost and durability?",
     "What are the ROI advantages of using precast concrete in construction projects?",
     "Can you provide a cost estimate for a 10,000 sq ft commercial building?",
@@ -70,12 +72,28 @@ with gr.Blocks() as demo:
             allow_custom_value=False,
             info="Pick a sample or type your own below."
         )
+    
     with gr.Row():
-        user_input = gr.Textbox(label="Your Question", lines=2)
+        user_input = gr.Textbox(
+            label="Your Question",
+            lines=2,
+            value=sample_dropdown.value
+        )
+
+    # Update the placeholder when the dropdown changes
+    def update_placeholder(selected):
+        return gr.update(value=selected)
+
+    sample_dropdown.change(
+        fn=update_placeholder,
+        inputs=sample_dropdown,
+        outputs=user_input,
+    )
+
+    submit_btn = gr.Button("Submit")
     with gr.Group():
         output = gr.Markdown(label="LLM Output")
     # output = gr.Textbox(label="LLM Output", lines=10)
-    submit_btn = gr.Button("Submit")
 
     submit_btn.click(fn=query_llm, inputs=user_input, outputs=output)
     start_flask_btn.click(fn=run_flask_server, outputs=flask_status)
