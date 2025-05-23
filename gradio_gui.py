@@ -21,6 +21,27 @@ def query_llm(user_input):
     except Exception as e:
         return f"Exception: {str(e)}"
 
+RAG_OPTIONS = ["LLM only", "LLM + RAG"]
+RAG_URLS = {
+    "LLM only": FLASK_URL,
+    "LLM + RAG": "http://127.0.0.1:5000/llm_rag_call"
+}
+
+def query_llm_with_rag(user_input, rag_mode):
+    url = RAG_URLS.get(rag_mode, FLASK_URL)
+    try:
+        response = requests.post(url, json={"input": user_input})
+        if response.status_code == 200:
+            data = response.json()
+            if "sources" in data:
+                return f"{data.get('response', 'No response from server.')}\n\n**Sources:**\n{data['sources']}"
+            else:
+                return data.get("response", "No response from server.")
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"Exception: {str(e)}"
+
 def run_flask_server():
     global flask_process
     if flask_process is None or flask_process.poll() is not None:
@@ -44,6 +65,19 @@ def stop_flask_server():
     else:
         return "Flask server is not running."
 
+MODE_OPTIONS = ["local", "openai", "cloudflare"]
+MODE_URL = "http://127.0.0.1:5000/set_mode"
+
+def set_mode_on_server(selected_mode):
+    try:
+        response = requests.post(MODE_URL, json={"mode": selected_mode})
+        if response.status_code == 200:
+            return f"Mode set to: {selected_mode}"
+        else:
+            return f"Error setting mode: {response.status_code} - {response.text}"
+    except Exception as e:
+        return f"Exception: {str(e)}"
+
 sample_questions = [
     "",
     "How do steel frame structures compare to concrete frame structures, considering cost and durability?",
@@ -61,6 +95,31 @@ with gr.Blocks() as demo:
     with gr.Row():
         gr.Markdown("### Note: The Flask server must be running to get a response.")
 
+    gr.Markdown("## LLM Mode Selection")
+    with gr.Row():
+        mode_radio = gr.Radio(
+            choices=MODE_OPTIONS,
+            value="cloudflare",
+            label="Select LLM Mode",
+            interactive=True
+        )
+        mode_status = gr.Textbox(label="Current Mode", lines=1)
+
+    mode_radio.change(
+        fn=set_mode_on_server,
+        inputs=mode_radio,
+        outputs=mode_status
+    )
+
+    gr.Markdown("## LLM Call Type")
+    with gr.Row():
+        rag_radio = gr.Radio(
+            choices=RAG_OPTIONS,
+            value="LLM only",
+            label="Choose LLM Call Type",
+            interactive=True
+        )
+
     gr.Markdown("# LLM Output Viewer\nEnter your question below:")
 
     with gr.Row():
@@ -72,7 +131,6 @@ with gr.Blocks() as demo:
             allow_custom_value=False,
             info="Pick a sample or type your own below."
         )
-    
     with gr.Row():
         user_input = gr.Textbox(
             label="Your Question",
@@ -95,7 +153,7 @@ with gr.Blocks() as demo:
         output = gr.Markdown(label="LLM Output")
     # output = gr.Textbox(label="LLM Output", lines=10)
 
-    submit_btn.click(fn=query_llm, inputs=user_input, outputs=output)
+    submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
     start_flask_btn.click(fn=run_flask_server, outputs=flask_status)
     stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
