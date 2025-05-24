@@ -9,6 +9,7 @@ import requests
 import server.config as config
 import datetime
 from logger_setup import setup_logger
+import time
 
 # === Constants and Config ===
 FLASK_URL = "http://127.0.0.1:5000/llm_call"  # Update if Flask runs elsewhere
@@ -153,7 +154,6 @@ def poll_flask_status(max_retries=20, delay=0.5):
     Poll the Flask /status endpoint until it returns 200 or timeout.
     Returns a status string for the UI.
     """
-    import time
     url = "http://127.0.0.1:5000/status"
     for _ in range(max_retries):
         try:
@@ -172,8 +172,13 @@ def start_flask_and_wait():
         status = poll_flask_status()
     return status
 
+first_cloudflare_status_call = True
+
 def get_cloudflare_model_status():
-    """Poll the backend /status endpoint and return a string with current Cloudflare models."""
+    global first_cloudflare_status_call
+    if first_cloudflare_status_call:
+        time.sleep(5)  # Small delay only on first call
+        first_cloudflare_status_call = False
     try:
         resp = requests.get("http://127.0.0.1:5000/status")
         if resp.status_code == 200:
@@ -194,135 +199,147 @@ def build_gradio_app():
         with gr.Row():
             start_flask_btn = gr.Button("Start Flask Server")
             stop_flask_btn = gr.Button("Stop Flask Server")
-            flask_status = gr.Textbox(label="Flask Server Status", lines=1, value="Default Status: Not Running", interactive=False)
+            flask_status = gr.Textbox(label="Flask Server Status", lines=1, value="Default Status: Not Running", interactive=False, elem_id="flask_status_box")
         with gr.Row():
             gr.Markdown("### Note: The Flask server must be running to get a response.")
 
-        gr.Markdown("## LLM Mode Selection")
-        with gr.Row():
-            mode_radio = gr.Radio(
-                choices=MODE_OPTIONS,
-                value="cloudflare",
-                label="Select LLM Mode",
-                interactive=True
+        # Hide everything below until Flask server is verified running
+        with gr.Column(visible=False) as main_content:
+            gr.Markdown("## LLM Mode Selection")
+            with gr.Row():
+                mode_radio = gr.Radio(
+                    choices=MODE_OPTIONS,
+                    value="cloudflare",
+                    label="Select LLM Mode",
+                    interactive=True
+                )
+                mode_status = gr.Textbox(label="Current Mode", lines=1, value="Default Mode: cloudflare")
+
+            # Cloudflare model selectors (hidden unless mode is cloudflare)
+            with gr.Row(visible=True) as cloudflare_model_row:
+                cf_gen_model = gr.Dropdown(
+                    choices=cloudflare_models,
+                    value=cloudflare_models[0],
+                    label="Cloudflare Text Generation Model",
+                    interactive=True
+                )
+                cf_emb_model = gr.Dropdown(
+                    choices=cloudflare_embedding_models,
+                    value=cloudflare_embedding_models[0],
+                    label="Cloudflare Embedding Model",
+                    interactive=True
+                )
+
+            # Add Cloudflare model status textbox and refresh button (initially visible only if mode is cloudflare)
+            with gr.Row(visible=True if mode_radio.value == "cloudflare" else False) as cf_model_status_row:
+                cf_model_status = gr.Textbox(
+                    label="Current Cloudflare Models (Backend Verified)",
+                    value=get_cloudflare_model_status(),
+                    lines=2,
+                    interactive=False
+                )
+                refresh_btn = gr.Button("Refresh Cloudflare Model Status")
+
+            # Function to refresh the Cloudflare model status
+            def refresh_cf_model_status():
+                return get_cloudflare_model_status()
+
+            refresh_btn.click(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+            cf_gen_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+            cf_emb_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+            mode_radio.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+
+            # Hide/show model status row based on mode
+            def toggle_cf_model_status_row(selected_mode):
+                return {cf_model_status_row: gr.update(visible=(selected_mode == "cloudflare"))}
+            mode_radio.change(fn=toggle_cf_model_status_row, inputs=mode_radio, outputs=[cf_model_status_row])
+
+            def toggle_cloudflare_models(selected_mode):
+                return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
+
+            mode_radio.change(
+                fn=set_mode_on_server,
+                inputs=mode_radio,
+                outputs=mode_status
             )
-            mode_status = gr.Textbox(label="Current Mode", lines=1, value="Default Mode: cloudflare")
-
-        # Cloudflare model selectors (hidden unless mode is cloudflare)
-        with gr.Row(visible=True) as cloudflare_model_row:
-            cf_gen_model = gr.Dropdown(
-                choices=cloudflare_models,
-                value=cloudflare_models[0],
-                label="Cloudflare Text Generation Model",
-                interactive=True
-            )
-            cf_emb_model = gr.Dropdown(
-                choices=cloudflare_embedding_models,
-                value=cloudflare_embedding_models[0],
-                label="Cloudflare Embedding Model",
-                interactive=True
-            )
-
-        # Add Cloudflare model status textbox
-        cf_model_status = gr.Textbox(
-            label="Current Cloudflare Models (Backend Verified)",
-            value=get_cloudflare_model_status(),
-            lines=2,
-            interactive=False
-        )
-
-        # Function to refresh the Cloudflare model status
-        def refresh_cf_model_status():
-            return get_cloudflare_model_status()
-
-        refresh_btn = gr.Button("Refresh Cloudflare Model Status")
-        refresh_btn.click(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
-
-        # Also refresh model status when dropdowns change
-        cf_gen_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
-        cf_emb_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
-        mode_radio.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
-
-        def toggle_cloudflare_models(selected_mode):
-            return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
-
-        mode_radio.change(
-            fn=set_mode_on_server,
-            inputs=mode_radio,
-            outputs=mode_status
-        )
-        mode_radio.change(
-            fn=toggle_cloudflare_models,
-            inputs=mode_radio,
-            outputs=[cloudflare_model_row]
-        )
-
-
-        gr.Markdown("## LLM Call Type")
-        with gr.Row():
-            rag_radio = gr.Radio(
-                choices=RAG_OPTIONS,
-                value="LLM only",
-                label="Choose LLM Call Type",
-                interactive=True
+            mode_radio.change(
+                fn=toggle_cloudflare_models,
+                inputs=mode_radio,
+                outputs=[cloudflare_model_row]
             )
 
-        gr.Markdown("# LLM Output Viewer\nEnter your question below:")
 
-        with gr.Row():
-            sample_dropdown = gr.Dropdown(
-                choices=sample_questions,
-                label="Or select a sample question",
-                interactive=True,
-                value=None,
-                allow_custom_value=False,
-                info="Pick a sample or type your own below."
+            gr.Markdown("## LLM Call Type")
+            with gr.Row():
+                rag_radio = gr.Radio(
+                    choices=RAG_OPTIONS,
+                    value="LLM only",
+                    label="Choose LLM Call Type",
+                    interactive=True
+                )
+
+            gr.Markdown("# LLM Output Viewer\nEnter your question below:")
+
+            with gr.Row():
+                sample_dropdown = gr.Dropdown(
+                    choices=sample_questions,
+                    label="Or select a sample question",
+                    interactive=True,
+                    value=None,
+                    allow_custom_value=False,
+                    info="Pick a sample or type your own below."
+                )
+            with gr.Row():
+                user_input = gr.Textbox(
+                    label="Your Question",
+                    lines=2,
+                    value=sample_dropdown.value
+                )
+
+            sample_dropdown.change(
+                fn=update_placeholder,
+                inputs=sample_dropdown,
+                outputs=user_input,
             )
-        with gr.Row():
-            user_input = gr.Textbox(
-                label="Your Question",
-                lines=2,
-                value=sample_dropdown.value
+
+            submit_btn = gr.Button("Submit")
+            with gr.Group():
+                gr.Markdown("## LLM Output:")
+                output = gr.Markdown(label="LLM Output")
+
+            def show_processing(*args):
+                return "_Processing..._"
+
+            submit_btn.click(fn=show_processing, inputs=[], outputs=output, queue=False)
+            submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
+            start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
+            stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
+
+            def set_cloudflare_models(mode, gen_model, emb_model):
+                import requests
+                requests.post(MODE_URL, json={
+                    "mode": mode,
+                    "cf_gen_model": gen_model,
+                    "cf_emb_model": emb_model
+                })
+
+            cf_gen_model.change(
+                fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
+                inputs=[cf_gen_model, cf_emb_model, mode_radio],
+                outputs=[]
+            )
+            cf_emb_model.change(
+                fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
+                inputs=[cf_gen_model, cf_emb_model, mode_radio],
+                outputs=[]
             )
 
-        sample_dropdown.change(
-            fn=update_placeholder,
-            inputs=sample_dropdown,
-            outputs=user_input,
-        )
-
-        submit_btn = gr.Button("Submit")
-        with gr.Group():
-            gr.Markdown("## LLM Output:")
-            output = gr.Markdown(label="LLM Output")
-
-        def show_processing(*args):
-            return "_Processing..._"
-
-        submit_btn.click(fn=show_processing, inputs=[], outputs=output, queue=False)
-        submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
-        start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
-        stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
-
-        def set_cloudflare_models(mode, gen_model, emb_model):
-            import requests
-            requests.post(MODE_URL, json={
-                "mode": mode,
-                "cf_gen_model": gen_model,
-                "cf_emb_model": emb_model
-            })
-
-        cf_gen_model.change(
-            fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
-            inputs=[cf_gen_model, cf_emb_model, mode_radio],
-            outputs=[]
-        )
-        cf_emb_model.change(
-            fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
-            inputs=[cf_gen_model, cf_emb_model, mode_radio],
-            outputs=[]
-        )
-
+        # Reveal main_content when Flask server is running
+        def show_main_content(status):
+            return {main_content: gr.update(visible=("running" in status.lower()))}
+        demo.load(fn=lambda: flask_status.value, outputs=None)
+        flask_status.change(fn=show_main_content, inputs=flask_status, outputs=[main_content])
+        demo.load(fn=start_flask_and_wait, outputs=flask_status)
     return demo
 
 print("\n" * 10)
