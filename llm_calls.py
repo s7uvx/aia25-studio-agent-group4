@@ -1,7 +1,11 @@
 import server.config as config  
+from cost_data.rsmeans_utils import load_rsmeans_data, get_cost_data
 
 # Routing Functions Below
 from utils import rag_utils
+
+# Load RSMeans data once at module level
+rsmeans_df = load_rsmeans_data()
 
 # Routing & Filtering Functions
 def classify_input(message: str) -> str:
@@ -291,6 +295,35 @@ def run_llm_query(system_prompt: str, user_input: str) -> str:
     )
     return response.choices[0].message.content.strip()
 
+def get_cost_benchmark_answer(query: str) -> str:
+    """
+    Answer a cost benchmark question using both RSMeans data and a tailored LLM prompt.
+    If RSMeans data is found, include a summary table and a short LLM-generated explanation referencing the data.
+    If not, fallback to LLM only.
+    """
+    result = get_cost_data(rsmeans_df, query)
+    if not result.empty:
+        # Format a summary of the relevant RSMeans data as a markdown table
+        summary_md = result[['Masterformat Section Code', 'Section Name', 'Name', 'Unit', 'Total Incl O&P']].to_markdown(index=False)
+        # Compose a prompt for the LLM to interpret the data
+        system_prompt = (
+            "You are a cost benchmark assistant. "
+            "Given the following RSMeans cost data (in markdown table format) and the user's question, provide a concise, clear answer. "
+            "Summarize the typical cost per unit, mention any relevant range, and note that actual costs may vary by project and location. "
+            "If multiple items are shown, explain the range and what affects it. "
+            "Always explicitly list out any assumptions you are making (such as location, year, unit, or scope). "
+            "Do not invent numbers; use only the data provided."
+        )
+        user_input = f"User question: {query}\n\nRSMeans data (markdown table):\n{summary_md}"
+        explanation = run_llm_query(system_prompt, user_input)
+        return f"**RSMeans Data:**\n\n{summary_md}\n\n**Interpretation:**\n{explanation}"
+    else:
+        # Fallback to LLM only, but require assumptions
+        prompt = (
+            agent_prompt_dict["get cost benchmarks"] + "\nAlways explicitly list out any assumptions you are making (such as location, year, unit, or scope)."
+        )
+        return run_llm_query(system_prompt=prompt, user_input=query)
+
 def route_query_to_function(message: str, collection=None, ranker=None, use_rag: bool=False):
     """
     Classify the user message into one of the five core categories and route it to the appropriate response function.
@@ -300,7 +333,7 @@ def route_query_to_function(message: str, collection=None, ranker=None, use_rag:
 
     match classification:
         case x if "cost benchmark" in x:
-            prompt = agent_prompt_dict["get cost benchmarks"]
+            return get_cost_benchmark_answer(message)
         case x if "roi analysis" in x:
             prompt = agent_prompt_dict["analyze roi sensitivity"]
         case x if "design-cost comparison" in x:
