@@ -42,7 +42,7 @@ cloudflare_embedding_models = [
     "@cf/baai/bge-m3",
 ]
 
-logger = setup_logger()
+logger = setup_logger(log_file="gradio_app.log")
 
 # === Global State ===
 flask_process = None
