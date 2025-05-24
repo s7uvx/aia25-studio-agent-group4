@@ -7,6 +7,8 @@ import subprocess
 import gradio as gr
 import requests
 import server.config as config
+import datetime
+from logger_setup import setup_logger
 
 # === Constants and Config ===
 FLASK_URL = "http://127.0.0.1:5000/llm_call"  # Update if Flask runs elsewhere
@@ -39,6 +41,8 @@ cloudflare_embedding_models = [
     "@cf/baai/bge-m3",
 ]
 
+logger = setup_logger()
+
 # === Global State ===
 flask_process = None
 
@@ -54,24 +58,59 @@ def query_llm(user_input):
         return f"Exception: {str(e)}"
 
 def query_llm_with_rag(user_input, rag_mode):
+    # Get mode and model info
+    mode = config.get_mode() if hasattr(config, 'get_mode') else 'unknown'
+    gen_model = None
+    emb_model = None
+    # Try to get current model selections if in cloudflare mode
+    try:
+        if mode == "cloudflare":
+            # Use gradio state if available, else fallback to config
+            gen_model = gr.get_value("cf_gen_model") if hasattr(gr, 'get_value') else None
+            emb_model = gr.get_value("cf_emb_model") if hasattr(gr, 'get_value') else None
+            if not gen_model:
+                gen_model = cloudflare_models[0]
+            if not emb_model:
+                emb_model = cloudflare_embedding_models[0]
+        else:
+            gen_model = getattr(config, 'completion_model', None)
+            emb_model = getattr(config, 'embedding_model', None)
+    except Exception:
+        gen_model = None
+        emb_model = None
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     output_header_markdown = f"### Input: {user_input}\n\n"
-
     url = RAG_URLS.get(rag_mode, FLASK_URL)
     try:
         response = requests.post(url, json={"input": user_input})
         if response.status_code == 200:
             data = response.json()
             if "sources" in data:
-                return (
+                response_text = data.get('response', 'No response from server.')
+                output = (
                     output_header_markdown
-                    + f"{data.get('response', 'No response from server.')}\n\n**Sources:**\n{data['sources']}"
+                    + f"{response_text}\n\n**Sources:**\n{data['sources']}"
                 )
             else:
-                return output_header_markdown + data.get("response", "No response from server.")
+                response_text = data.get("response", "No response from server.")
+                output = output_header_markdown + response_text
         else:
-            return output_header_markdown + f"Error: {response.status_code} - {response.text}"
+            response_text = f"Error: {response.status_code} - {response.text}"
+            output = output_header_markdown + response_text
     except Exception as e:
-        return output_header_markdown + f"Exception: {str(e)}"
+        response_text = f"Exception: {str(e)}"
+        output = output_header_markdown + response_text
+    # Log the call
+    logger.info({
+        "timestamp": timestamp,
+        "prompt": user_input,
+        "mode": mode,
+        "text_generation_model": gen_model,
+        "embedding_model": emb_model,
+        "rag_state": rag_mode,
+        "output": response_text
+    })
+    return output
 
 def run_flask_server():
     global flask_process
@@ -140,7 +179,7 @@ def build_gradio_app():
         with gr.Row():
             start_flask_btn = gr.Button("Start Flask Server")
             stop_flask_btn = gr.Button("Stop Flask Server")
-            flask_status = gr.Textbox(label="Flask Server Status", lines=1)
+            flask_status = gr.Textbox(label="Flask Server Status", lines=1, value="Default Status: Not Running", interactive=False)
         with gr.Row():
             gr.Markdown("### Note: The Flask server must be running to get a response.")
 
@@ -152,7 +191,7 @@ def build_gradio_app():
                 label="Select LLM Mode",
                 interactive=True
             )
-            mode_status = gr.Textbox(label="Current Mode", lines=1)
+            mode_status = gr.Textbox(label="Current Mode", lines=1, value="Default Mode: cloudflare")
 
         # Cloudflare model selectors (hidden unless mode is cloudflare)
         with gr.Row(visible=True) as cloudflare_model_row:
