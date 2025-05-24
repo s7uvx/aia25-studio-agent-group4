@@ -53,7 +53,13 @@ def set_mode():
 
 @app.route('/status', methods=['GET'])
 def status():
-    return jsonify({'status': 'ok'}), 200
+    # Return current mode and models for UI polling
+    return jsonify({
+        'status': 'ok',
+        'mode': config.get_mode(),
+        'cf_gen_model': getattr(config, 'completion_model', None),
+        'cf_emb_model': getattr(config, 'embedding_model', None)
+    }), 200
 
 if __name__ == '__main__':
     app.run(debug=True)

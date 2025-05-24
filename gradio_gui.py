@@ -172,6 +172,21 @@ def start_flask_and_wait():
         status = poll_flask_status()
     return status
 
+def get_cloudflare_model_status():
+    """Poll the backend /status endpoint and return a string with current Cloudflare models."""
+    try:
+        resp = requests.get("http://127.0.0.1:5000/status")
+        if resp.status_code == 200:
+            data = resp.json()
+            if data.get("mode") == "cloudflare":
+                return f"Cloudflare Text Gen Model: {data.get('cf_gen_model', 'N/A')}\nCloudflare Embedding Model: {data.get('cf_emb_model', 'N/A')}"
+            else:
+                return "Cloudflare models not active (mode: %s)" % data.get("mode", "unknown")
+        else:
+            return f"Error: {resp.status_code}"
+    except Exception as e:
+        return f"Exception: {str(e)}"
+
 # === Gradio UI Definition ===
 def build_gradio_app():
     with gr.Blocks() as demo:
@@ -207,6 +222,26 @@ def build_gradio_app():
                 label="Cloudflare Embedding Model",
                 interactive=True
             )
+
+        # Add Cloudflare model status textbox
+        cf_model_status = gr.Textbox(
+            label="Current Cloudflare Models (Backend Verified)",
+            value=get_cloudflare_model_status(),
+            lines=2,
+            interactive=False
+        )
+
+        # Function to refresh the Cloudflare model status
+        def refresh_cf_model_status():
+            return get_cloudflare_model_status()
+
+        refresh_btn = gr.Button("Refresh Cloudflare Model Status")
+        refresh_btn.click(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+
+        # Also refresh model status when dropdowns change
+        cf_gen_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+        cf_emb_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
+        mode_radio.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
 
         def toggle_cloudflare_models(selected_mode):
             return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
@@ -268,6 +303,25 @@ def build_gradio_app():
         submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
         start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
         stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
+
+        def set_cloudflare_models(mode, gen_model, emb_model):
+            import requests
+            requests.post(MODE_URL, json={
+                "mode": mode,
+                "cf_gen_model": gen_model,
+                "cf_emb_model": emb_model
+            })
+
+        cf_gen_model.change(
+            fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
+            inputs=[cf_gen_model, cf_emb_model, mode_radio],
+            outputs=[]
+        )
+        cf_emb_model.change(
+            fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
+            inputs=[cf_gen_model, cf_emb_model, mode_radio],
+            outputs=[]
+        )
 
     return demo
 
