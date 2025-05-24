@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 # import ghhops_server as hs
 import llm_calls
 from utils import rag_utils
@@ -12,29 +12,39 @@ collection, ranker = rag_utils.init_rag(mode=config.get_mode())
 def llm_call():
     data = request.get_json()
     input_string = data.get('input', '')
+    stream = data.get('stream', False)
 
-    # router_output = llm_calls.classify_input(input_string)
-    # if "Refuse to answer" in router_output:
-    #     answer = "Sorry, I can only answer questions about cost estimating and roi."
-    # else:
-    #     answer = llm_calls.suggest_cost_optimizations(input_string)
-    answer = llm_calls.route_query_to_function(input_string)
-
-    return jsonify({'response': answer})
+    if stream:
+        def generate():
+            for chunk in llm_calls.route_query_to_function(input_string, stream=True):
+                yield chunk
+        return Response(generate(), mimetype='text/plain')
+    else:
+        answer = llm_calls.route_query_to_function(input_string)
+        return jsonify({'response': answer})
 
 @app.route('/llm_rag_call', methods=['POST'])
 def llm_rag_call():
     data = request.get_json()
     input_string = data.get('input', '')
+    stream = data.get('stream', False)
 
-    # router_output = llm_calls.classify_input(input_string)
-    # if "Refuse to answer" in router_output:
-    #     answer = "Sorry, I can only answer questions about cost estimating and roi."
-    # else:
-    # answer, sources = rag_utils.rag_call_alt(input_string, collection, ranker)
-    answer, sources = llm_calls.route_query_to_function(input_string, collection, ranker, True)
-
-    return jsonify({'response': answer, 'sources': sources})
+    if stream:
+        def generate():
+            answer, sources = llm_calls.route_query_to_function(input_string, collection, ranker, True, stream=True)
+            # If answer is a generator, yield from it
+            if hasattr(answer, '__iter__') and not isinstance(answer, str):
+                for chunk in answer:
+                    yield chunk
+            else:
+                yield str(answer)
+            # Optionally, yield sources at the end (as JSON or plain text)
+            if sources:
+                yield f"\n\n[SOURCES]: {sources}"
+        return Response(generate(), mimetype='text/plain')
+    else:
+        answer, sources = llm_calls.route_query_to_function(input_string, collection, ranker, True)
+        return jsonify({'response': answer, 'sources': sources})
 
 @app.route('/set_mode', methods=['POST'])
 def set_mode():

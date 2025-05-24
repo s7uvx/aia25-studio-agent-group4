@@ -58,15 +58,12 @@ def query_llm(user_input):
     except Exception as e:
         return f"Exception: {str(e)}"
 
-def query_llm_with_rag(user_input, rag_mode):
-    # Get mode and model info
+def query_llm_with_rag(user_input, rag_mode, stream_mode):
     mode = config.get_mode() if hasattr(config, 'get_mode') else 'unknown'
     gen_model = None
     emb_model = None
-    # Try to get current model selections if in cloudflare mode
     try:
         if mode == "cloudflare":
-            # Use gradio state if available, else fallback to config
             gen_model = gr.get_value("cf_gen_model") if hasattr(gr, 'get_value') else None
             emb_model = gr.get_value("cf_emb_model") if hasattr(gr, 'get_value') else None
             if not gen_model:
@@ -83,35 +80,68 @@ def query_llm_with_rag(user_input, rag_mode):
     output_header_markdown = f"### Input: {user_input}\n\n"
     url = RAG_URLS.get(rag_mode, FLASK_URL)
     try:
-        response = requests.post(url, json={"input": user_input})
-        if response.status_code == 200:
-            data = response.json()
-            if "sources" in data:
-                response_text = data.get('response', 'No response from server.')
-                output = (
-                    output_header_markdown
-                    + f"{response_text}\n\n**Sources:**\n{data['sources']}"
-                )
+        if stream_mode == "Streaming":
+            # Streaming mode: use requests with stream=True
+            response = requests.post(url, json={"input": user_input, "stream": True}, stream=True)
+            if response.status_code == 200:
+                streamed_text = ""
+                for chunk in response.iter_content(chunk_size=None, decode_unicode=True):
+                    if chunk:
+                        print(chunk, end="", flush=True)  # Print to console for testing
+                        streamed_text += chunk
+                        yield streamed_text  # Update Gradio output live
+                # Log the call
+                logger.info({
+                    "timestamp": timestamp,
+                    "prompt": user_input,
+                    "mode": mode,
+                    "text_generation_model": gen_model,
+                    "embedding_model": emb_model,
+                    "rag_state": rag_mode,
+                    "output": streamed_text
+                })
             else:
-                response_text = data.get("response", "No response from server.")
-                output = output_header_markdown + response_text
+                yield output_header_markdown + f"Error: {response.status_code} - {response.text}"
         else:
-            response_text = f"Error: {response.status_code} - {response.text}"
-            output = output_header_markdown + response_text
+            response = requests.post(url, json={"input": user_input})
+            if response.status_code == 200:
+                data = response.json()
+                if "sources" in data:
+                    response_text = data.get('response', 'No response from server.')
+                    output = (
+                        output_header_markdown
+                        + f"{response_text}\n\n**Sources:**\n{data['sources']}"
+                    )
+                else:
+                    response_text = data.get("response", "No response from server.")
+                    output = output_header_markdown + response_text
+            else:
+                response_text = f"Error: {response.status_code} - {response.text}"
+                output = output_header_markdown + response_text
+            # Log the call
+            logger.info({
+                "timestamp": timestamp,
+                "prompt": user_input,
+                "mode": mode,
+                "text_generation_model": gen_model,
+                "embedding_model": emb_model,
+                "rag_state": rag_mode,
+                "output": response_text
+            })
+            yield output
     except Exception as e:
         response_text = f"Exception: {str(e)}"
         output = output_header_markdown + response_text
-    # Log the call
-    logger.info({
-        "timestamp": timestamp,
-        "prompt": user_input,
-        "mode": mode,
-        "text_generation_model": gen_model,
-        "embedding_model": emb_model,
-        "rag_state": rag_mode,
-        "output": response_text
-    })
-    return output
+        logger.info({
+            "timestamp": timestamp,
+            "prompt": user_input,
+            "mode": mode,
+            "text_generation_model": gen_model,
+            "embedding_model": emb_model,
+            "rag_state": rag_mode,
+            "output": response_text
+        })
+        yield output
 
 def run_flask_server():
     global flask_process
@@ -291,6 +321,12 @@ def build_gradio_app():
                     label="Choose LLM Call Type",
                     interactive=True
                 )
+                stream_radio = gr.Radio(
+                    choices=["Standard", "Streaming"],
+                    value="Standard",
+                    label="Response Mode",
+                    interactive=True
+                )
 
             gr.Markdown("# LLM Output Viewer\nEnter your question below:")
 
@@ -323,7 +359,7 @@ def build_gradio_app():
                 output = gr.Markdown(label="LLM Output")
 
             submit_btn.click(fn=show_processing, inputs=[], outputs=output, queue=False)
-            submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
+            submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio, stream_radio], outputs=output, queue=True)
             start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
             stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
