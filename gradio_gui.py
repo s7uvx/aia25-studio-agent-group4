@@ -41,8 +41,7 @@ def query_llm(user_input):
         return f"Exception: {str(e)}"
 
 def query_llm_with_rag(user_input, rag_mode):
-    output_header_markdown = f"## LLM Output for {rag_mode}:\n\n"
-    output_header_markdown += f"### Input: {user_input}\n\n"
+    output_header_markdown = f"### Input: {user_input}\n\n"
 
     url = RAG_URLS.get(rag_mode, FLASK_URL)
     try:
@@ -183,10 +182,14 @@ def build_gradio_app():
 
         submit_btn = gr.Button("Submit")
         with gr.Group():
-            gr.Markdown("### LLM Output:")
+            gr.Markdown("## LLM Output:")
             output = gr.Markdown(label="LLM Output")
 
-        submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
+        def show_processing(*args):
+            return "_Processing..._"
+
+        submit_btn.click(fn=show_processing, inputs=[], outputs=output, queue=False)
+        submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
         start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
         stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
