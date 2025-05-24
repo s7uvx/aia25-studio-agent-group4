@@ -192,6 +192,29 @@ def get_cloudflare_model_status():
     except Exception as e:
         return f"Exception: {str(e)}"
 
+# === Cloudflare Model Functions (module-level, UI-independent) ===
+def set_cloudflare_models(mode, gen_model, emb_model):
+    """
+    Update the backend with the selected Cloudflare models and mode.
+    """
+    try:
+        requests.post(MODE_URL, json={
+            "mode": mode,
+            "cf_gen_model": gen_model,
+            "cf_emb_model": emb_model
+        })
+    except Exception as e:
+        logger.error(f"Failed to set Cloudflare models: {e}")
+
+def refresh_cf_model_status():
+    """
+    Refresh the Cloudflare model status from the backend.
+    """
+    return get_cloudflare_model_status()
+
+def show_processing(*args):
+    return "_Processing..._"
+
 # === Gradio UI Definition ===
 def build_gradio_app():
     with gr.Blocks() as demo:
@@ -240,34 +263,25 @@ def build_gradio_app():
                 )
                 refresh_btn = gr.Button("Refresh Cloudflare Model Status")
 
-            # Function to refresh the Cloudflare model status
-            def refresh_cf_model_status():
-                return get_cloudflare_model_status()
+            # UI-dependent callbacks (must be defined here)
+            def toggle_cf_model_status_row(selected_mode):
+                return {cf_model_status_row: gr.update(visible=(selected_mode == "cloudflare"))}
+
+            def toggle_cloudflare_models(selected_mode):
+                return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
+
+            def show_main_content(status):
+                return {main_content: gr.update(visible=("running" in status.lower()))}
 
             refresh_btn.click(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
             cf_gen_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
             cf_emb_model.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
             mode_radio.change(fn=refresh_cf_model_status, inputs=[], outputs=cf_model_status)
-
-            # Hide/show model status row based on mode
-            def toggle_cf_model_status_row(selected_mode):
-                return {cf_model_status_row: gr.update(visible=(selected_mode == "cloudflare"))}
             mode_radio.change(fn=toggle_cf_model_status_row, inputs=mode_radio, outputs=[cf_model_status_row])
-
-            def toggle_cloudflare_models(selected_mode):
-                return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
-
-            mode_radio.change(
-                fn=set_mode_on_server,
-                inputs=mode_radio,
-                outputs=mode_status
-            )
-            mode_radio.change(
-                fn=toggle_cloudflare_models,
-                inputs=mode_radio,
-                outputs=[cloudflare_model_row]
-            )
-
+            mode_radio.change(fn=toggle_cloudflare_models, inputs=mode_radio, outputs=[cloudflare_model_row])
+            mode_radio.change(fn=set_mode_on_server, inputs=mode_radio, outputs=mode_status)
+            cf_gen_model.change(fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb), inputs=[cf_gen_model, cf_emb_model, mode_radio], outputs=[])
+            cf_emb_model.change(fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb), inputs=[cf_gen_model, cf_emb_model, mode_radio], outputs=[])
 
             gr.Markdown("## LLM Call Type")
             with gr.Row():
@@ -304,39 +318,15 @@ def build_gradio_app():
 
             submit_btn = gr.Button("Submit")
             with gr.Group():
+                gr.Markdown("------")
                 gr.Markdown("## LLM Output:")
                 output = gr.Markdown(label="LLM Output")
-
-            def show_processing(*args):
-                return "_Processing..._"
 
             submit_btn.click(fn=show_processing, inputs=[], outputs=output, queue=False)
             submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output, queue=True)
             start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
             stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
-            def set_cloudflare_models(mode, gen_model, emb_model):
-                import requests
-                requests.post(MODE_URL, json={
-                    "mode": mode,
-                    "cf_gen_model": gen_model,
-                    "cf_emb_model": emb_model
-                })
-
-            cf_gen_model.change(
-                fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
-                inputs=[cf_gen_model, cf_emb_model, mode_radio],
-                outputs=[]
-            )
-            cf_emb_model.change(
-                fn=lambda gen, emb, mode: set_cloudflare_models(mode, gen, emb),
-                inputs=[cf_gen_model, cf_emb_model, mode_radio],
-                outputs=[]
-            )
-
-        # Reveal main_content when Flask server is running
-        def show_main_content(status):
-            return {main_content: gr.update(visible=("running" in status.lower()))}
         demo.load(fn=lambda: flask_status.value, outputs=None)
         flask_status.change(fn=show_main_content, inputs=flask_status, outputs=[main_content])
         demo.load(fn=start_flask_and_wait, outputs=flask_status)
