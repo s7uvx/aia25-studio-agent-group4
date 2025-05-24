@@ -19,6 +19,7 @@ MODE_OPTIONS = ["local", "openai", "cloudflare"]
 MODE_URL = "http://127.0.0.1:5000/set_mode"
 sample_questions = [
     "",
+    "What is the typical cost per sqft for structural steel options?  Let's assume a four-story apartment building.  Make assumptions on the loading.",
     "How do steel frame structures compare to concrete frame structures, considering cost and durability?",
     "What are the ROI advantages of using precast concrete in construction projects?",
     "Can you provide a cost estimate for a 10,000 sq ft commercial building?",
@@ -96,6 +97,30 @@ def set_mode_on_server(selected_mode):
 def update_placeholder(selected):
     return gr.update(value=selected)
 
+def poll_flask_status(max_retries=20, delay=0.5):
+    """
+    Poll the Flask /status endpoint until it returns 200 or timeout.
+    Returns a status string for the UI.
+    """
+    import time
+    url = "http://127.0.0.1:5000/status"
+    for _ in range(max_retries):
+        try:
+            resp = requests.get(url, timeout=1)
+            if resp.status_code == 200:
+                return "Flask server is running."
+        except Exception:
+            pass
+        time.sleep(delay)
+    return "Flask server did not respond in time. Check logs."
+
+def start_flask_and_wait():
+    status = run_flask_server()
+    if "started" in status:
+        # Only poll if we just started it
+        status = poll_flask_status()
+    return status
+
 # === Gradio UI Definition ===
 def build_gradio_app():
     with gr.Blocks() as demo:
@@ -162,12 +187,12 @@ def build_gradio_app():
             output = gr.Markdown(label="LLM Output")
 
         submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
-        start_flask_btn.click(fn=run_flask_server, outputs=flask_status)
+        start_flask_btn.click(fn=start_flask_and_wait, outputs=flask_status)
         stop_flask_btn.click(fn=stop_flask_server, outputs=flask_status)
 
     return demo
 
 print("\n" * 10)
 print("Running gradio GUI...")
-app = build_gradio_app()
-app.launch(inbrowser=True)
+demo = build_gradio_app()
+demo.launch(inbrowser=True)
