@@ -3,7 +3,6 @@
 
 import pandas as pd
 import server.config as config
-from llm_calls import run_llm_query
 
 # For reference, the following are the columns in the RSMeans DataFrame:
 # ['Masterformat Section Code', 'Section Name', 'ID', 'Name', 'Crew', 'Daily Output', 'Labor-Hours','Unit', 'Material', 'Labor', 'Equipment', 'Total', 'Total Incl O&P']
@@ -48,6 +47,7 @@ def find_by_description(df, description):
     Returns the matching row(s) from the DataFrame.
     Also supports fuzzy matching: if LLM returns no match, try fuzzy search on section names.
     """
+    from llm_calls import run_llm_query  # Local import to avoid circular import
     # Get unique list of codes and section names
     unique_sections = df[['Masterformat Section Code', 'Section Name']].drop_duplicates().reset_index(drop=True)
     section_list = unique_sections.apply(lambda row: f"{row['Masterformat Section Code']}: {row['Section Name']}", axis=1).tolist()

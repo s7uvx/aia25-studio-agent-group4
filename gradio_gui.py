@@ -158,6 +158,7 @@ def build_gradio_app():
 
         submit_btn = gr.Button("Submit")
         with gr.Group():
+            gr.Markdown("### LLM Output:")
             output = gr.Markdown(label="LLM Output")
 
         submit_btn.click(fn=query_llm_with_rag, inputs=[user_input, rag_radio], outputs=output)
