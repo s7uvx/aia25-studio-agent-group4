@@ -26,15 +26,27 @@ def load_rsmeans_data(csv_path=None):
 
 def find_by_section_code(df, section_code):
     """
-    Filter the DataFrame by Masterformat Section Code (exact match).
+    Filter the DataFrame by Masterformat Section Code (exact match or fuzzy match).
+    Fuzzy match: if no exact match, return rows where the code starts with or contains the input (ignoring whitespace/case).
     """
-    return df[df['Masterformat Section Code'] == section_code]
+    # Exact match first
+    match = df[df['Masterformat Section Code'] == section_code]
+    if not match.empty:
+        return match
+    # Fuzzy match: ignore case/whitespace, allow startswith or contains
+    code_norm = section_code.replace(' ', '').lower()
+    fuzzy = df[df['Masterformat Section Code'].str.replace(' ', '').str.lower().str.startswith(code_norm)]
+    if not fuzzy.empty:
+        return fuzzy
+    fuzzy_contains = df[df['Masterformat Section Code'].str.replace(' ', '').str.lower().str.contains(code_norm)]
+    return fuzzy_contains
 
 
 def find_by_description(df, description):
     """
     Use LLM to select the most appropriate Masterformat code from the available list for a given description.
     Returns the matching row(s) from the DataFrame.
+    Also supports fuzzy matching: if LLM returns no match, try fuzzy search on section names.
     """
     # Get unique list of codes and section names
     unique_sections = df[['Masterformat Section Code', 'Section Name']].drop_duplicates().reset_index(drop=True)
@@ -52,7 +64,16 @@ def find_by_description(df, description):
     selected_code = run_llm_query(system_prompt, user_input)
     # Filter DataFrame for the selected code
     match = df[df['Masterformat Section Code'] == selected_code.strip()]
-    return match
+    if not match.empty:
+        return match
+    # Fuzzy match: try to find section names that contain the description (case-insensitive)
+    desc_norm = description.strip().lower()
+    fuzzy = df[df['Section Name'].str.lower().str.contains(desc_norm)]
+    if not fuzzy.empty:
+        return fuzzy
+    # Also try fuzzy match on Masterformat Section Code (in case user enters a partial code as description)
+    code_fuzzy = df[df['Masterformat Section Code'].str.replace(' ', '').str.lower().str.contains(desc_norm.replace(' ', ''))]
+    return code_fuzzy
 
 
 def get_cost_data(df, section_code_or_desc):
