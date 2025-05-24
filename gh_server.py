@@ -40,13 +40,16 @@ def llm_rag_call():
 def set_mode():
     data = request.get_json()
     mode = data.get('mode', None)
+    cf_gen_model = data.get('cf_gen_model', None)
+    cf_emb_model = data.get('cf_emb_model', None)
     if mode not in ["local", "openai", "cloudflare"]:
         return jsonify({'status': 'error', 'message': 'Invalid mode'}), 400
-    config.set_mode(mode)
+    # Pass model overrides to config
+    config.set_mode(mode, cf_gen_model=cf_gen_model, cf_emb_model=cf_emb_model)
     # Optionally, re-initialize RAG collection/ranker if needed
     global collection, ranker
     collection, ranker = rag_utils.init_rag(mode=mode)
-    return jsonify({'status': 'success', 'mode': mode})
+    return jsonify({'status': 'success', 'mode': mode, 'cf_gen_model': cf_gen_model, 'cf_emb_model': cf_emb_model})
 
 @app.route('/status', methods=['GET'])
 def status():

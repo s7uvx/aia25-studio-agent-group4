@@ -25,6 +25,19 @@ sample_questions = [
     "Can you provide a cost estimate for a 10,000 sq ft commercial building?",
     "What are the key factors affecting the cost of a residential building?",
 ]
+cloudflare_models = [
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/meta/llama-3.1-70b-instruct",
+    "@cf/qwen/qwen2.5-coder-32b-instruct",
+    "@cf/deepseek-ai/deepseek-r1-distill-qwen-32b",
+    "@cf/deepseek-ai/deepseek-math-7b-instruct",
+]
+cloudflare_embedding_models = [
+    "@cf/baai/bge-base-en-v1.5",
+    "@cf/baai/bge-large-en-v1.5",
+    "@cf/baai/bge-small-en-v1.5",
+    "@cf/baai/bge-m3",
+]
 
 # === Global State ===
 flask_process = None
@@ -141,11 +154,35 @@ def build_gradio_app():
             )
             mode_status = gr.Textbox(label="Current Mode", lines=1)
 
+        # Cloudflare model selectors (hidden unless mode is cloudflare)
+        with gr.Row(visible=True) as cloudflare_model_row:
+            cf_gen_model = gr.Dropdown(
+                choices=cloudflare_models,
+                value=cloudflare_models[0],
+                label="Cloudflare Text Generation Model",
+                interactive=True
+            )
+            cf_emb_model = gr.Dropdown(
+                choices=cloudflare_embedding_models,
+                value=cloudflare_embedding_models[0],
+                label="Cloudflare Embedding Model",
+                interactive=True
+            )
+
+        def toggle_cloudflare_models(selected_mode):
+            return {cloudflare_model_row: gr.update(visible=(selected_mode == "cloudflare"))}
+
         mode_radio.change(
             fn=set_mode_on_server,
             inputs=mode_radio,
             outputs=mode_status
         )
+        mode_radio.change(
+            fn=toggle_cloudflare_models,
+            inputs=mode_radio,
+            outputs=[cloudflare_model_row]
+        )
+
 
         gr.Markdown("## LLM Call Type")
         with gr.Row():
