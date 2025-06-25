@@ -1031,3 +1031,4 @@ with st.expander("IFC File Management", expanded=False):
     download_latest = st.button("Download Latest IFC File")
     if download_latest:
         ifc_file_download()
+        
