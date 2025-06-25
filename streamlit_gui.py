@@ -678,17 +678,17 @@ col1, col2, col3 = st.columns(3)
 
 with col1:
     st.markdown("#### 1. Construction Cost")
-    st.markdown("How the construction cost data has been extracted from the RSMeans database, what it includes and how it has been embedded into our RAG")
+    st.markdown("Construction costs include labor, materials, permits, and other costs that form the project budget. Without careful planning, costs often exceed budgets by significant margins, making accurate estimation critical")
     st.button("Construction Cost Info", key="cost_info")
 
 with col2:
     st.markdown("#### 2. Market Value")
-    st.markdown("How we have extracted the market value, and how we have handled the information to train our model")
+    st.markdown("Market value is the price buyers will pay, usually estimated by comparing similar property sales. It depends on factors like location, features, and market conditions, defining the project's value")
     st.button("Market Value Info", key="value_info")
 
 with col3:
     st.markdown("#### 3. Returns")
-    st.markdown("An explanation on how ROI is calculated with the current limitations and assumptions of the model")
+    st.markdown("ROI is the project’s profit divided by its total investment cost. Developers find it hard to predict ROI accurately because it requires forecasting future values and costs under uncertain conditions")
     st.button("ROI Info", key="roi_info")
 
 # Section 3: Current Model Summary
