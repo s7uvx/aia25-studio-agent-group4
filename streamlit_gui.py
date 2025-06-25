@@ -8,11 +8,8 @@ import subprocess
 import os
 import time
 import threading
-import datetime
-import server.config as config
 from logger_setup import setup_logger
-import networkx as nx
-import plotly.graph_objects as go
+# import plotly.graph_objects as go
 from streamlit_gui_flowchart import parse_log_flowchart, plot_flowchart
 import pandas as pd
 import re
@@ -21,6 +18,9 @@ import tempfile
 import pyvista as pv
 import streamlit.components.v1 as components
 import socket
+import plotly.graph_objects as go
+import plotly.express as px
+import numpy as np
 
 def find_open_port(preferred_port, max_tries=20):
     """Find an open port, starting from preferred_port, up to max_tries."""
@@ -513,8 +513,15 @@ def show_ifcjs_viewer_vite(height=600):
 
 # --- Streamlit Chat Interface with Sample Questions ---
 st.set_page_config(page_title="ROI LLM Assistant", layout="wide")
-st.title("ROI LLM Assistant")
-# st.markdown("This is a Streamlit GUI for the ROI LLM Assistant.")
+
+# Define color palette
+COLORS = ['#e18989', '#d2e189', '#89e1b4', '#89b4e1', '#d289e1', '#ffa600', '#ff69b4']
+
+# Initialize session state
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+if "sample_input" not in st.session_state:
+    st.session_state["sample_input"] = ""
 
 start_message = st.warning("Starting Flask server...")
 if "FLASK_PORT" not in st.session_state:
@@ -554,15 +561,176 @@ while poll_flask_status() != "Flask server is running.":
 # Update the start message
 start_message.empty()
 
+# Helper functions for dashboard components
+def get_mock_building_metrics():
+    """Get mock building metrics data"""
+    return {
+        "estimated_cost": 4200000,
+        "projected_value": 6100000,
+        "roi": 312,
+        "floor_area_ratio": 3.8,
+        "units": {"total": 48, "2br": 32, "1br": 16},
+        "circulation_ratio": 18.2
+    }
+
+def get_mock_cost_components():
+    """Get mock cost components data"""
+    return {
+        "Structure": 1200000,
+        "Facade": 850000,
+        "MEP": 750000,
+        "Interior": 600000,
+        "Site Work": 400000,
+        "Other": 400000
+    }
+
+def create_pie_chart(data, title):
+    """Create a pie chart with custom colors"""
+    fig = go.Figure(data=[go.Pie(
+        labels=list(data.keys()),
+        values=list(data.values()),
+        marker_colors=COLORS[:len(data)],
+        textinfo='label+percent',
+        textposition='inside'
+    )])
+    fig.update_layout(
+        title=title,
+        showlegend=True,
+        height=400,
+        font=dict(size=12)
+    )
+    return fig
+
+def create_bar_chart(data, title, x_label, y_label):
+    """Create a bar chart with custom colors"""
+    fig = go.Figure(data=[go.Bar(
+        x=list(data.keys()),
+        y=list(data.values()),
+        marker_color=COLORS[0]
+    )])
+    fig.update_layout(
+        title=title,
+        xaxis_title=x_label,
+        yaxis_title=y_label,
+        height=400
+    )
+    return fig
+
+def create_roi_sensitivity_curve():
+    """Create ROI sensitivity curve"""
+    # Mock data for sensitivity analysis
+    cost_variations = np.linspace(-20, 30, 50)
+    roi_values = []
+    base_cost = 4200000
+    base_value = 6100000
+    
+    for variation in cost_variations:
+        adjusted_cost = base_cost * (1 + variation/100)
+        roi = ((base_value - adjusted_cost) / adjusted_cost) * 100
+        roi_values.append(roi)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=cost_variations,
+        y=roi_values,
+        mode='lines',
+        line=dict(color=COLORS[3], width=3),
+        name='ROI Sensitivity'
+    ))
+    fig.update_layout(
+        title='ROI Sensitivity Analysis',
+        xaxis_title='Cost Variation (%)',
+        yaxis_title='ROI (%)',
+        height=400,
+        showlegend=False
+    )
+    return fig
+
+# === NEW DASHBOARD SECTIONS ===
+
+# Page Header with Navigation
+st.title("Yield Copilot")
+st.markdown("### Home • Cost • Value • Returns")
+
+# Section 1: Visual Introduction with Full-Width IFC Viewer
+st.markdown("---")
+st.markdown("## Current IFC Model Viewer")
+
+# Full-width IFC viewer
+show_ifcjs_viewer_vite(height=500)
+
+# Mock key metrics display
+metrics = get_mock_building_metrics()
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("Estimated Cost", f"${metrics['estimated_cost']:,.0f}")
+with col2:
+    st.metric("Projected Value", f"${metrics['projected_value']:,.0f}")
+with col3:
+    st.metric("ROI", f"{metrics['roi']}%")
+
+# Section 2: Yield Principles
+st.markdown("---")
+st.markdown("## Yield Principles")
+st.markdown("Here we briefly explain how the 3 main principles of our idea work:")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown("#### 1. Construction Cost")
+    st.markdown("How the construction cost data has been extracted from the RSMeans database, what it includes and how it has been embedded into our RAG")
+    st.button("Construction Cost Info", key="cost_info")
+
+with col2:
+    st.markdown("#### 2. Market Value")
+    st.markdown("How we have extracted the market value, and how we have handled the information to train our model")
+    st.button("Market Value Info", key="value_info")
+
+with col3:
+    st.markdown("#### 3. Returns")
+    st.markdown("An explanation on how ROI is calculated with the current limitations and assumptions of the model")
+    st.button("ROI Info", key="roi_info")
+
+# Section 3: Current Model Summary
+st.markdown("---")
+st.markdown("## Current Model Summary")
+
+col_viewer_small, col_summary = st.columns([1, 1])
+
+with col_viewer_small:
+    st.markdown("#### Model Name")
+    show_ifcjs_viewer_vite(height=300)
+
+with col_summary:
+    st.markdown("#### Current Model Summary")
+    filename = get_latest_ifc_filename()
+    if filename:
+        st.write(f"**Filename:** {filename}")
+        # Display summary metrics
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.metric("Floor Area Ratio", f"{metrics['floor_area_ratio']}")
+        with col_b:
+            st.metric("Units", f"{metrics['units']['total']}")
+            st.caption(f"{metrics['units']['2br']} x 2BR, {metrics['units']['1br']} x 1BR")
+        with col_c:
+            st.metric("Circulation Ratio", f"{metrics['circulation_ratio']}%")
+
+# Section 4: Ask Me Anything
+st.markdown("---")
+st.markdown("## Ask me Anything")
+st.markdown("Feel free to ask any question related to the project, including 'what if' scenarios or test my skills with some of the pre-defined areas of expertise below")
+
+# LLM Configuration (collapsed by default)
 with st.expander("LLM Configuration", expanded=False):
-    st.markdown("## LLM Mode Selection")
+    st.markdown("### LLM Mode Selection")
     mode = st.segmented_control("Select LLM Mode", MODE_OPTIONS, default=MODE_OPTIONS[1], key="mode_radio", selection_mode="single")
     mode_status = set_mode_on_server(mode)
     st.text(mode_status)
 
     # Cloudflare model selectors
     if mode == "cloudflare":
-        st.markdown("### Cloudflare Model Selection")
+        st.markdown("#### Cloudflare Model Selection")
         cf_gen_model = st.selectbox("Cloudflare Text Generation Model", cloudflare_models, key="cf_gen_model")
         cf_sml_model = st.selectbox("Cloudflare Small Task Model", cloudflare_sml_models, key="cf_sml_model")
         cf_emb_model = st.selectbox("Cloudflare Embedding Model", cloudflare_embedding_models, key="cf_emb_model")
@@ -570,47 +738,24 @@ with st.expander("LLM Configuration", expanded=False):
         cf_model_status = get_cloudflare_model_status()
         st.text_area("Current Cloudflare Models (Backend Verified)", cf_model_status, height=68)
 
-    st.markdown("## LLM Call Type")
+    st.markdown("### LLM Call Type")
     stream_mode = st.segmented_control("Response Mode", ["Standard", "Streaming"], default="Streaming", key="stream_radio", selection_mode="single")
     max_tokens = st.number_input("Max Tokens", min_value=100, max_value=4096, value=1500, step=1, key="max_tokens_input")
 
-# --- IFC File Upload Section ---
-with st.expander("IFC File Management", expanded=False):
-    st.markdown("## Upload Your IFC File")
-    with st.form("ifc_upload_form", clear_on_submit=True):
-        uploaded_ifc = st.file_uploader("Choose an IFC file to upload", type=["ifc"], key="ifc_file_uploader")
-        upload_button = st.form_submit_button("Upload IFC File")
-        if upload_button:
-            ifc_file_upload(uploaded_ifc)
-    download_latest = st.button("Download Latest IFC File")
-    if download_latest:
-        ifc_file_download()
-    
-    summary_col, viewer_col = st.columns([1, 3], vertical_alignment="top")
-    with summary_col:
-        # Always refresh summary and BIM viewer if a file is loaded
-        # if uploaded_ifc is not None:
-            st.markdown("#### Current IFC Model Summary")
-            st.write("")
-            filename = get_latest_ifc_filename()
-            if filename:
-                current_ifc_url = f"http://127.0.0.1:{FLASK_PORT}/download_ifc/{filename}"
-                current_ifc = requests.get(current_ifc_url).content
-                st.caption(f"Showing summary for: {filename}")
-                visualize_ifc_summary(current_ifc)
-            else:
-                st.info("No IFC file found.")
-    with viewer_col:
-        st.markdown("#### Current IFC Model Viewer")
-        show_ifcjs_viewer_vite()
+# Chat interface
+col_chat_input, col_sample = st.columns([3, 1])
 
-# --- Streamlit Chat Interface with Sample Questions ---
-if "messages" not in st.session_state:
-    st.session_state["messages"] = []
-if "sample_input" not in st.session_state:
-    st.session_state["sample_input"] = ""
+with col_chat_input:
+    user_input = st.chat_input("Type your question here...", key="chat_input")
 
-chat_message_container = st.container(border=True, height=550)
+with col_sample:
+    sample = st.selectbox("Or select a sample question", sample_questions, key="sample_dropdown")
+    send_sample = st.button("Send Sample Question")
+
+# Chat Response Area
+st.markdown("#### Chat Response Area")
+chat_message_container = st.container(border=True, height=400)
+
 with chat_message_container:
     for msg in st.session_state["messages"]:
         with st.chat_message(msg["role"]):
@@ -650,14 +795,6 @@ with chat_message_container:
                     render_token_usage_report(logs, elapsed_time=elapsed_time)
             else:
                 st.markdown(msg["content"])
-with st.container():
-    user_input = st.chat_input("Type your question or select a sample below...", key="chat_input")
-
-col1, col2 = st.columns([3, 1], vertical_alignment="bottom")
-with col1:
-    sample = st.selectbox("Or select a sample question", sample_questions, key="sample_dropdown")
-with col2:
-    send_sample = st.button("Send Sample Question")
 
 # Handle sending a sample question
 if send_sample and sample:
@@ -666,3 +803,231 @@ if send_sample and sample:
 # Handle freeform chat input
 if user_input:
     handle_chat_interaction(user_input, chat_message_container, default_rag_mode, stream_mode, max_tokens)
+
+# Section 5: Live Design Companion
+st.markdown("---")
+st.markdown("## Live Design Companion")
+st.markdown("Here we describe the Current Key metrics of the model as it currently is.")
+
+# Key Metrics with Pie Chart
+col_metrics, col_pie = st.columns([1, 1])
+
+with col_metrics:
+    st.markdown("#### Key Metrics")
+    st.metric("Estimated Cost", f"${metrics['estimated_cost']:,.0f}")
+    st.metric("Projected Value", f"${metrics['projected_value']:,.0f}")
+    st.metric("ROI", f"{metrics['roi']}%")
+
+with col_pie:
+    # Create pie chart for cost breakdown
+    cost_data = get_mock_cost_components()
+    pie_fig = create_pie_chart(cost_data, "Cost Components Breakdown")
+    st.plotly_chart(pie_fig, use_container_width=True, key="cost_breakdown_pie")
+
+# Design Impact with Bar Chart
+col_bar, col_design_metrics = st.columns([1, 1])
+
+with col_bar:
+    # Create bar chart for design metrics
+    design_data = {
+        "Floor Area Ratio": metrics['floor_area_ratio'],
+        "Total Units": metrics['units']['total'],
+        "Circulation %": metrics['circulation_ratio']
+    }
+    bar_fig = create_bar_chart(design_data, "Design Impact Metrics", "Metric", "Value")
+    st.plotly_chart(bar_fig, use_container_width=True, key="design_impact_bar")
+
+with col_design_metrics:
+    st.markdown("#### Design Impact")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.metric("Floor Area Ratio", f"{metrics['floor_area_ratio']}")
+        st.metric("Total Units", f"{metrics['units']['total']}")
+    with col_b:
+        st.metric("2BR Units", f"{metrics['units']['2br']}")
+        st.metric("1BR Units", f"{metrics['units']['1br']}")
+    st.metric("Circulation Ratio", f"{metrics['circulation_ratio']}%")
+
+# Section 6: Scenario Comparison
+st.markdown("---")
+st.markdown("## Scenario Comparison")
+st.markdown("Where we test our copilot's capacity to guide us through different design iterations")
+
+col_scenario_a, col_scenario_b = st.columns(2)
+
+with col_scenario_a:
+    st.markdown("#### Scenario A")
+    st.markdown("**Brick & Glass Facade**")
+    
+    # Scenario A controls
+    floors_a = st.slider("Floors", 3, 15, 8, key="floors_a")
+    units_a = st.slider("Units", 20, 100, 45, key="units_a")
+    facade_a = st.selectbox("Facade Type", ["Brick & Glass", "Full Glass", "Concrete"], key="facade_a")
+    structure_a = st.selectbox("Structure", ["Steel", "Concrete", "Hybrid"], key="structure_a")
+    
+    # Mock calculations for Scenario A
+    cost_a = 5600000
+    roi_a = 131
+    
+    st.metric("Cost", f"${cost_a:,.0f}")
+    st.metric("ROI", f"{roi_a}%")
+    
+    # Pros and Cons
+    st.markdown("**Pros:**")
+    st.markdown("- High Finishes")
+    st.markdown("- Local Materials")
+    st.markdown("- No Delays")
+    
+    st.markdown("**Cons:**")
+    st.markdown("- Cost Limited Units")
+    st.markdown("- Not the target ratios")
+
+with col_scenario_b:
+    st.markdown("#### Scenario B")
+    st.markdown("**Full Glass Facade**")
+    
+    # Scenario B controls
+    floors_b = st.slider("Floors", 3, 15, 10, key="floors_b")
+    units_b = st.slider("Units", 20, 100, 55, key="units_b")
+    facade_b = st.selectbox("Facade Type", ["Full Glass", "Brick & Glass", "Concrete"], key="facade_b")
+    structure_b = st.selectbox("Structure", ["Concrete", "Steel", "Hybrid"], key="structure_b")
+    
+    # Mock calculations for Scenario B
+    cost_b = 7300000
+    roi_b = 107
+    
+    st.metric("Cost", f"${cost_b:,.0f}")
+    st.metric("ROI", f"{roi_b}%")
+    
+    # Pros and Cons
+    st.markdown("**Pros:**")
+    st.markdown("- Hits the Targets")
+    st.markdown("- Increases unit count by 10%")
+    st.markdown("- Affordable Finishes")
+    
+    st.markdown("**Cons:**")
+    st.markdown("- Quality gets compromised")
+    st.markdown("- Importing Materials")
+    st.markdown("- Will Face severe delays")
+
+# Scenario comparison chart
+st.markdown("#### Scenario Comparison Chart")
+comparison_data = {
+    "Scenario A": [cost_a/1000000, roi_a],
+    "Scenario B": [cost_b/1000000, roi_b]
+}
+
+fig_comparison = go.Figure()
+fig_comparison.add_trace(go.Bar(
+    name='Cost (M$)',
+    x=['Scenario A', 'Scenario B'],
+    y=[cost_a/1000000, cost_b/1000000],
+    marker_color=COLORS[0],
+    yaxis='y'
+))
+fig_comparison.add_trace(go.Bar(
+    name='ROI (%)',
+    x=['Scenario A', 'Scenario B'],
+    y=[roi_a, roi_b],
+    marker_color=COLORS[1],
+    yaxis='y2'
+))
+
+fig_comparison.update_layout(
+    title='Scenario Comparison: Cost vs ROI',
+    xaxis_title='Scenario',
+    yaxis=dict(title='Cost (Million $)', side='left'),
+    yaxis2=dict(title='ROI (%)', side='right', overlaying='y'),
+    barmode='group',
+    height=400
+)
+
+st.plotly_chart(fig_comparison, use_container_width=True, key="scenario_comparison_chart")
+
+# Section 7: Cost & ROI Analysis
+st.markdown("---")
+st.markdown("## Cost + ROI Analysis")
+st.markdown("Where we draw the conclusions from the current analysis")
+
+# Cost Components and ROI Sensitivity
+col_cost_chart, col_roi_curve = st.columns(2)
+
+with col_cost_chart:
+    st.markdown("#### Cost Components")
+    cost_data = get_mock_cost_components()
+    cost_fig = create_pie_chart(cost_data, "Cost Components Breakdown")
+    st.plotly_chart(cost_fig, use_container_width=True, key="final_cost_breakdown_pie")
+
+with col_roi_curve:
+    st.markdown("#### ROI Sensitivity Curve")
+    roi_fig = create_roi_sensitivity_curve()
+    st.plotly_chart(roi_fig, use_container_width=True, key="roi_sensitivity_curve")
+
+# Current Chosen Scenario Summary
+st.markdown("#### Current Chosen Scenario")
+
+col_summary_metrics, col_summary_text = st.columns([1, 2])
+
+with col_summary_metrics:
+    st.metric("Cost per Sqft", "$310")
+    st.metric("Value per Sqft", "$462")
+    st.metric("ROI Yield", "181%")
+
+with col_summary_text:
+    st.markdown('**"Overall project cost increased by 14% compared to baseline scenario."**')
+    st.markdown('**"Façade choice contributes 22% of total cost – consider alternative finishes."**')
+    st.markdown('**"Parking ratio exceeds minimum requirements; reducing it could save $480k."**')
+
+# Detailed Analysis Sections
+st.markdown("#### Detailed Analysis")
+
+col_analysis_1, col_analysis_2 = st.columns(2)
+
+with col_analysis_1:
+    # Cost Analysis
+    st.markdown("##### Cost Analysis")
+    st.markdown("• Façade choice contributes 22% of total cost – consider alternative finishes.")
+    st.markdown("• Parking ratio exceeds minimum requirements; reducing it could save $480k.")
+    st.markdown("• Changing structure to hybrid timber/steel saves 9% on construction costs.")
+    st.markdown("• Structural spans exceed standard limits; may require redesign or increased cost.")
+    
+    # Strategic Design
+    st.markdown("##### Strategic Design")
+    st.markdown("• Reducing circulation area by 4% unlocks one additional rentable unit per floor.")
+    st.markdown("• Current configuration exceeds FAR limits for the site — zoning adjustment required.")
+    st.markdown("• East-facing units have the highest value per sq ft; prioritize views and daylight.")
+    st.markdown("• Courtyard reduces unit count but boosts perceived value — consider hybrid typology.")
+
+with col_analysis_2:
+    # ROI & Value
+    st.markdown("##### ROI & Value")
+    st.markdown("• Projected ROI is 28.6%, a 3.2% improvement over the previous version.")
+    st.markdown("• Value per square meter improved by 7% due to unit mix optimization.")
+    st.markdown("• Adding 2 floors increases cost by 11% but ROI only improves by 1.5% — diminishing returns.")
+    st.markdown("• Net revenue per unit increased with smaller 1BR units, despite lower rent/unit.")
+    
+    # Financial Strategy
+    st.markdown("##### Financial Strategy")
+    st.markdown("• This scenario may require updated financing strategy due to increased CAPEX.")
+    st.markdown("• Flagged as high-design, high-cost — recommended for premium rental tier.")
+    st.markdown("• Consider tenant amenity trade-off: rooftop deck vs. rentable floor area.")
+    st.markdown("• Feasibility rating: Green (Design within financial target envelope).")
+
+# Constructability & Phasing
+st.markdown("##### Constructability & Phasing")
+st.markdown("• Phased construction strategy recommended: podium + tower staging reduces financial exposure.")
+st.markdown("• Selected materials may require longer lead times — impact on delivery schedule.")
+st.markdown("• Structural spans exceed standard limits; may require redesign or increased cost.")
+
+# IFC File Management (moved to bottom)
+with st.expander("IFC File Management", expanded=False):
+    st.markdown("#### Upload Your IFC File")
+    with st.form("ifc_upload_form", clear_on_submit=True):
+        uploaded_ifc = st.file_uploader("Choose an IFC file to upload", type=["ifc"], key="ifc_file_uploader")
+        upload_button = st.form_submit_button("Upload IFC File")
+        if upload_button:
+            ifc_file_upload(uploaded_ifc)
+    
+    download_latest = st.button("Download Latest IFC File")
+    if download_latest:
+        ifc_file_download()
